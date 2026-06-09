@@ -1,0 +1,33 @@
+{
+  "servers": {
+    "shortsforge": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "shortsforge-mcp"],
+      "env": {
+        "OPENAI_API_KEY": "${input:openai_api_key}",
+        "AZURE_FOUNDRY_ENDPOINT": "${input:azure_foundry_endpoint}",
+        "AZURE_FOUNDRY_KEY": "${input:azure_foundry_key}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "openai_api_key",
+      "type": "promptString",
+      "description": "OpenAI API Key (BYOK)",
+      "password": true
+    },
+    {
+      "id": "azure_foundry_endpoint",
+      "type": "promptString",
+      "description": "Azure Foundry IQ Endpoint URL"
+    },
+    {
+      "id": "azure_foundry_key",
+      "type": "promptString",
+      "description": "Azure Foundry IQ API Key",
+      "password": true
+    }
+  ]
+}

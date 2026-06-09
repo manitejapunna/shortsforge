@@ -1,0 +1,46 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Environment & Secrets — NEVER COMMIT
+.env
+.env.local
+.env.*.local
+**/secrets/
+config/secrets.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+client_secret*.json
+token*.json
+
+# Output & cache
+output/
+!output/.gitkeep
+.secrets.baseline
+
+# Media samples (provide your own)
+samples/*.mp4
+samples/*.mov
+samples/*.m4a
+samples/*.wav
+samples/*.mp3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/settings.json
+
+# Virtual environments
+.venv
+
+.coverage
+.pytest_cache/
+

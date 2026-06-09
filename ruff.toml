@@ -1,0 +1,25 @@
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "ASYNC", # flake8-async
+    "RUF", # ruff-specific rules
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "S101", # assert statements in tests
+    "S603", # subprocess calls (we validate ourselves in security.paths)
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106", "S311"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

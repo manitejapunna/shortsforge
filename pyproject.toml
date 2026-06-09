@@ -1,0 +1,53 @@
+[project]
+name = "shortsforge"
+version = "0.1.0"
+description = "AI-powered short-form video studio with MCP server and Foundry IQ grounding"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "moviepy>=1.0.3",
+    "ffmpeg-python>=0.2.0",
+    "faster-whisper>=1.0.0",
+    "pillow>=10.0.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.27.0",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "structlog>=24.0.0",
+    "python-ulid>=2.0.0",
+    "keyring>=25.0.0",
+    "cryptography>=42.0.0",
+    "openai>=1.0.0",
+    "click>=8.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.4.0",
+    "bandit>=1.7.0",
+    "pip-audit>=2.7.0",
+    "detect-secrets>=1.5.0",
+    "cyclonedx-bom>=4.0.0",
+]
+
+[project.scripts]
+shortsforge-mcp = "shortsforge.mcp_server.server:main"
+shortsforge = "shortsforge.cli.main:cli"
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=src/shortsforge/pipeline --cov-report=term-missing --cov-fail-under=0"
