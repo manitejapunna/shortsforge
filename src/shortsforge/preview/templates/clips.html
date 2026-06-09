@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}My Clips · ShortsForge{% endblock %}
+{% block heading %}🎞️ My Clips{% endblock %}
+{% block subheading %}All clips in your workspace{% endblock %}
+
+{% block content %}
+{% if clips %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for clip_id, entry in clips.items() %}
+  <a href="/clip/{{ clip_id }}" class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-orange-400 transition">
+    <div class="aspect-[9/16] bg-slate-800 rounded-lg mb-3 flex items-center justify-center text-4xl">
+      🎬
+    </div>
+    <div class="text-sm font-mono text-orange-300 truncate">{{ clip_id[:12] }}…</div>
+    <div class="text-xs text-slate-500 truncate mt-1">
+      {{ entry.path.split('/')[-1].split('\\')[-1] if entry.path else '—' }}
+    </div>
+    {% if entry.parent %}
+    <div class="text-xs text-slate-600 mt-1">↳ from {{ entry.parent[:10] }}…</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-slate-500 py-20">
+  <div class="text-6xl mb-4">🎞️</div>
+  <p>No clips yet. Generate a story or repurpose a video.</p>
+</div>
+{% endif %}
+{% endblock %}

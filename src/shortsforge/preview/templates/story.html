@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Story Studio · ShortsForge{% endblock %}
+{% block heading %}📖 Story Studio{% endblock %}
+{% block subheading %}Generate grounded short-form stories with Foundry IQ citations{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Form -->
+  <form hx-post="/story/generate" hx-target="#story-output" hx-swap="innerHTML"
+        hx-indicator="#story-spinner"
+        class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">Story prompt</label>
+      <textarea name="prompt" required rows="4"
+                placeholder="A child discovers a glowing seed that grows into a friend…"
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-purple-400 focus:outline-none"></textarea>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Audience</label>
+        <input name="audience" value="kids 6-10"
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-purple-400 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Length (seconds)</label>
+        <input name="length_seconds" type="number" value="30" min="15" max="90"
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-purple-400 focus:outline-none" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Tone</label>
+      <select name="tone" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-purple-400 focus:outline-none">
+        <option value="soothing">😌 Soothing</option>
+        <option value="punchy" selected>⚡ Punchy</option>
+        <option value="mysterious">🔮 Mysterious</option>
+        <option value="uplifting">🌟 Uplifting</option>
+        <option value="educational">🎓 Educational</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">
+        Foundry IQ Knowledge Base
+        <span class="text-xs text-slate-500 font-normal">(optional — grounds story in real sources)</span>
+      </label>
+      <input name="kb_id" placeholder="kb_abc123 (leave blank for ungrounded)"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-purple-400 focus:outline-none" />
+    </div>
+
+    <div class="pt-2 flex items-center gap-3">
+      <button type="submit"
+              class="bg-purple-500 hover:bg-purple-400 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+        ✨ Generate Story
+      </button>
+      <span id="story-spinner" class="htmx-indicator text-sm text-purple-300">
+        Generating…
+      </span>
+    </div>
+  </form>
+
+  <!-- Output -->
+  <div id="story-output" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 min-h-[400px]">
+    <div class="text-center text-slate-500 py-20">
+      <div class="text-6xl mb-4">📖</div>
+      <p>Your generated story will appear here.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

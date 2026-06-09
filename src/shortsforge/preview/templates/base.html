@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}ShortsForge{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/sse.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .glow { box-shadow: 0 0 24px rgba(255, 136, 0, 0.25); }
+    .scanline {
+      background: linear-gradient(180deg, rgba(255,136,0,0.05) 50%, transparent 50%);
+      background-size: 100% 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+      <div class="px-6 py-5 border-b border-slate-800">
+        <a href="/" class="flex items-center gap-2">
+          <span class="text-2xl">🎬</span>
+          <span class="text-xl font-bold text-orange-400">ShortsForge</span>
+        </a>
+        <p class="text-xs text-slate-500 mt-1">AI Content Studio</p>
+      </div>
+
+      <nav class="flex-1 px-3 py-4 space-y-1">
+        {% set nav = [
+          ('/', '🏠', 'Dashboard'),
+          ('/story', '📖', 'Story Studio'),
+          ('/script', '🎬', 'Script Studio'),
+          ('/repurpose', '✂️', 'Repurpose Studio'),
+          ('/clips', '🎞️', 'My Clips'),
+          ('/jobs', '⏳', 'Jobs'),
+        ] %}
+        {% for href, icon, label in nav %}
+        <a href="{{ href }}"
+           class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition
+                  {% if active == href %}bg-orange-500/10 text-orange-400 border border-orange-500/30{% else %}text-slate-300 hover:bg-slate-800{% endif %}">
+          <span>{{ icon }}</span>
+          <span class="text-sm font-medium">{{ label }}</span>
+        </a>
+        {% endfor %}
+      </nav>
+
+      <div class="px-4 py-4 border-t border-slate-800 text-xs text-slate-500">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+          Localhost only · Secure
+        </div>
+        <div class="mt-1">Microsoft Foundry IQ ✦ GitHub Copilot</div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-y-auto">
+      <header class="bg-slate-900/50 border-b border-slate-800 px-8 py-4 backdrop-blur">
+        <h1 class="text-xl font-semibold">{% block heading %}{% endblock %}</h1>
+        <p class="text-sm text-slate-400 mt-0.5">{% block subheading %}{% endblock %}</p>
+      </header>
+
+      <div class="px-8 py-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

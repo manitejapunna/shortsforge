@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Jobs · ShortsForge{% endblock %}
+{% block heading %}⏳ Jobs{% endblock %}
+{% block subheading %}Recent pipeline jobs{% endblock %}
+
+{% block content %}
+{% if jobs %}
+<div class="space-y-3">
+  {% for j in jobs %}
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div class="flex items-center justify-between">
+      <div class="flex-1">
+        <div class="text-sm font-medium">{{ j.message or j.state }}</div>
+        <div class="text-xs text-slate-500 font-mono mt-1">{{ j.job_id }}</div>
+      </div>
+      <span class="text-xs px-3 py-1 rounded-full
+        {% if j.state == 'done' %}bg-green-500/20 text-green-300
+        {% elif j.state == 'error' %}bg-red-500/20 text-red-300
+        {% elif j.state == 'running' %}bg-blue-500/20 text-blue-300
+        {% else %}bg-slate-700 text-slate-300{% endif %}">
+        {{ j.state }}
+      </span>
+    </div>
+    {% if j.state == 'running' %}
+    <div class="mt-2 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+      <div class="bg-blue-400 h-full transition-all" style="width: {{ (j.progress * 100) | int }}%"></div>
+    </div>
+    {% endif %}
+    {% if j.error %}
+    <div class="mt-2 text-xs text-red-300 font-mono bg-red-500/10 p-2 rounded">{{ j.error }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-slate-500 py-20">
+  <div class="text-6xl mb-4">⏳</div>
+  <p>No jobs yet.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Script Studio · ShortsForge{% endblock %}
+{% block heading %}🎬 Script Studio{% endblock %}
+{% block subheading %}Screenplay, dialogue, or voiceover — grounded in real-world context{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <form hx-post="/script/generate" hx-target="#script-output" hx-swap="innerHTML"
+        hx-indicator="#script-spinner"
+        class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Logline</label>
+      <textarea name="logline" required rows="3"
+                placeholder="A junior dev pitches an AI feature to a skeptical CTO during a hackathon demo."
+                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"></textarea>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Genre</label>
+        <input name="genre" value="tech comedy"
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Format</label>
+        <select name="format" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+          <option value="screenplay">🎬 Screenplay (Fountain)</option>
+          <option value="dialogue" selected>💬 Dialogue</option>
+          <option value="voiceover">🎙️ Voiceover</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Characters (comma-separated)</label>
+      <input name="characters" value="Alex, Sam"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">
+        Foundry IQ Knowledge Base
+        <span class="text-xs text-slate-500 font-normal">(optional — grounds characters/settings)</span>
+      </label>
+      <input name="kb_id" placeholder="kb_abc123"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-blue-400 focus:outline-none" />
+    </div>
+
+    <div class="pt-2 flex items-center gap-3">
+      <button type="submit"
+              class="bg-blue-500 hover:bg-blue-400 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+        🎬 Generate Script
+      </button>
+      <span id="script-spinner" class="htmx-indicator text-sm text-blue-300">
+        Writing…
+      </span>
+    </div>
+  </form>
+
+  <div id="script-output" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 min-h-[400px]">
+    <div class="text-center text-slate-500 py-20">
+      <div class="text-6xl mb-4">🎬</div>
+      <p>Your script will appear here.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

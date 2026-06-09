@@ -142,6 +142,17 @@ def script(logline: str, genre: str, characters: tuple, fmt: str, kb_id: str | N
     asyncio.run(_run())
 
 
+@cli.command()
+@click.option("--no-browser", is_flag=True, help="Don't auto-open browser")
+def app(no_browser: bool) -> None:
+    """Launch the ShortsForge web app at http://127.0.0.1:7878."""
+    from shortsforge.preview.app import run_preview_server
+    console.print("[bold orange3]Starting ShortsForge Studio...[/bold orange3]")
+    console.print("[dim]URL: http://127.0.0.1:7878 (localhost only)[/dim]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+    run_preview_server(open_browser=not no_browser)
+
+
 @cli.group()
 def auth() -> None:
     """Authentication commands."""
@@ -151,9 +162,9 @@ def auth() -> None:
 def auth_youtube() -> None:
     """Authenticate with YouTube using OAuth."""
     from shortsforge.publishing.youtube_auth import run_oauth_flow
-    console.print("[dim]Starting YouTube OAuth flow…[/dim]")
+    console.print("[dim]Starting YouTube OAuth flow...[/dim]")
     run_oauth_flow()
-    console.print("[green]✓ YouTube authentication complete.[/green]")
+    console.print("[green]YouTube authentication complete.[/green]")
 
 
 if __name__ == "__main__":

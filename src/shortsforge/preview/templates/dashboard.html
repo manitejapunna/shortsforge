@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · ShortsForge{% endblock %}
+{% block heading %}Welcome to ShortsForge{% endblock %}
+{% block subheading %}AI-powered short-form content studio — grounded by Microsoft Foundry IQ{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  <a href="/story" class="group bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-500/30 rounded-2xl p-6 hover:border-purple-400 transition glow">
+    <div class="text-4xl mb-3">📖</div>
+    <h3 class="text-lg font-semibold mb-2 group-hover:text-purple-300">Story Studio</h3>
+    <p class="text-sm text-slate-400">Generate grounded short-form stories with citations. Perfect for bedtime stories, educational shorts, and narrative content.</p>
+  </a>
+
+  <a href="/script" class="group bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-2xl p-6 hover:border-blue-400 transition glow">
+    <div class="text-4xl mb-3">🎬</div>
+    <h3 class="text-lg font-semibold mb-2 group-hover:text-blue-300">Script Studio</h3>
+    <p class="text-sm text-slate-400">Write screenplays, dialogue, or voiceover scripts. Real-world knowledge shapes every scene via Foundry IQ.</p>
+  </a>
+
+  <a href="/repurpose" class="group bg-gradient-to-br from-orange-900/40 to-slate-900 border border-orange-500/30 rounded-2xl p-6 hover:border-orange-400 transition glow">
+    <div class="text-4xl mb-3">✂️</div>
+    <h3 class="text-lg font-semibold mb-2 group-hover:text-orange-300">Repurpose Studio</h3>
+    <p class="text-sm text-slate-400">Turn podcasts and long-form video into 3 viral YouTube Shorts in one click. AI hook detection + auto-captions.</p>
+  </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+      <span class="text-2xl">🎞️</span> Recent Clips
+    </h3>
+    {% if clips %}
+    <div class="space-y-2">
+      {% for clip_id, entry in clips.items() %}
+      <a href="/clip/{{ clip_id }}" class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition">
+        <div>
+          <div class="text-sm font-mono text-orange-300">{{ clip_id[:12] }}…</div>
+          <div class="text-xs text-slate-500">{{ entry.path.split('/')[-1].split('\\')[-1] if entry.path else '—' }}</div>
+        </div>
+        <span class="text-xs text-slate-400">▶</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-500">No clips yet. Generate a story or repurpose a video to get started.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+      <span class="text-2xl">⏳</span> Recent Jobs
+    </h3>
+    {% if jobs %}
+    <div class="space-y-2">
+      {% for j in jobs %}
+      <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+        <div class="flex-1">
+          <div class="text-sm">{{ j.message or j.state }}</div>
+          <div class="text-xs text-slate-500 font-mono">{{ j.job_id }}</div>
+        </div>
+        <span class="text-xs px-2 py-1 rounded-full
+          {% if j.state == 'done' %}bg-green-500/20 text-green-300
+          {% elif j.state == 'error' %}bg-red-500/20 text-red-300
+          {% elif j.state == 'running' %}bg-blue-500/20 text-blue-300
+          {% else %}bg-slate-700 text-slate-300{% endif %}">
+          {{ j.state }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-500">No jobs yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Repurpose Studio · ShortsForge{% endblock %}
+{% block heading %}✂️ Repurpose Studio{% endblock %}
+{% block subheading %}Turn long-form video into viral YouTube Shorts in one click{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <form hx-post="/repurpose/start" hx-target="#repurpose-output" hx-swap="innerHTML"
+        class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Source video path</label>
+      <input name="source_path" required placeholder="samples/podcast.mp4"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-orange-400 focus:outline-none" />
+      <p class="text-xs text-slate-500 mt-1">Must be under <code>samples/</code> or <code>output/</code>.</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-2">Niche</label>
+        <input name="niche" value="AI devtools" required
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-orange-400 focus:outline-none" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Number of Shorts</label>
+        <input name="count" type="number" value="3" min="1" max="10"
+               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-orange-400 focus:outline-none" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">Caption preset</label>
+      <select name="caption_preset" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-orange-400 focus:outline-none">
+        <option value="bold-pop" selected>🔥 Bold Pop (high energy)</option>
+        <option value="subtle-bottom">✨ Subtle Bottom (educational)</option>
+        <option value="glow-center">💫 Glow Center (aesthetic)</option>
+        <option value="meme">😂 Meme</option>
+      </select>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <input type="checkbox" name="add_broll" id="add_broll" checked
+             class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-orange-500 focus:ring-orange-400" />
+      <label for="add_broll" class="text-sm">Add AI b-roll on talking-head segments</label>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-2">
+        Foundry IQ KB
+        <span class="text-xs text-slate-500 font-normal">(optional — adds citations to titles)</span>
+      </label>
+      <input name="kb_id" placeholder="kb_abc123"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-orange-400 focus:outline-none" />
+    </div>
+
+    <div class="pt-2">
+      <button type="submit"
+              class="bg-orange-500 hover:bg-orange-400 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+        ✂️ Generate Shorts
+      </button>
+    </div>
+  </form>
+
+  <div id="repurpose-output" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 min-h-[400px]">
+    <div class="text-center text-slate-500 py-20">
+      <div class="text-6xl mb-4">✂️</div>
+      <p>Job status will stream here.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
