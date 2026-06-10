@@ -40,6 +40,8 @@ uv sync --extra dev
 cp .env.example .env   # fill in your API keys
 ```
 
+For a full setup walkthrough (environment variables, required keys, FFmpeg, troubleshooting), see [notes.md](notes.md).
+
 ## VS Code MCP Setup
 
 The `.vscode/mcp.json` is pre-configured. Open VS Code in this folder and start Copilot Chat — the ShortsForge agent will be available.
