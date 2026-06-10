@@ -217,7 +217,7 @@ async def _llm_rerank(
         "Return JSON only."
     )
     user = (
-        f"Select the top {count} hooks from these snippets for the '{niche}' niche.\n\n"
+        f"Choose the top {count} hooks from these snippets for the '{niche}' niche.\n\n"
         f"{wrapped_snippets}\n\n"
         "For each, return: start_s, end_s, headline (≤10 words), "
         "predicted_retention (0-1), rationale (1-2 sentences), audience_fit_tags[].\n"
