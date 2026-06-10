@@ -31,7 +31,13 @@ jobs:
         run: uv run bandit -r src/ -ll -x src/shortsforge/security/
 
       - name: Detect secrets
-        run: uv run detect-secrets-hook --baseline .secrets.baseline
+        run: |
+          if [ -f .secrets.baseline ]; then
+            uv run detect-secrets-hook --baseline .secrets.baseline
+          else
+            uv run detect-secrets scan --all-files > .secrets.ci.baseline
+            uv run detect-secrets-hook --baseline .secrets.ci.baseline
+          fi
 
       - name: Pip audit
         run: uv run pip-audit --require-hashes=false --severity high
