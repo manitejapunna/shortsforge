@@ -168,11 +168,11 @@ async def story_generate(
             kb_id=kb_id or None,
         )
     except Exception as exc:
+        if _is_missing_llm_credentials(exc):
+            logger.warning("story_generate.llm_credentials_missing")
+            return HTMLResponse(_llm_credentials_missing_card("Story Studio"))
         logger.exception("story_generate.error")
-        return HTMLResponse(
-            f"<div class='text-red-300 bg-red-500/10 p-4 rounded-lg'>"
-            f"<strong>Error:</strong> {_escape(str(exc))}</div>"
-        )
+        return HTMLResponse(_error_card(str(exc)))
 
     scenes_html = ""
     for i, scene in enumerate(story.scenes, 1):
@@ -267,6 +267,9 @@ async def script_generate(
             kb_id=kb_id or None,
         )
     except Exception as exc:
+        if _is_missing_llm_credentials(exc):
+            logger.warning("script_generate.llm_credentials_missing")
+            return HTMLResponse(_llm_credentials_missing_card("Script Studio"))
         logger.exception("script_generate.error")
         return HTMLResponse(_error_card(str(exc)))
 
@@ -318,6 +321,10 @@ async def repurpose_start(
     kb_id: str = Form(""),
 ):
     _touch()
+
+    if not _llm_credentials_configured():
+        logger.warning("repurpose_start.llm_credentials_missing")
+        return HTMLResponse(_llm_credentials_missing_card("Repurpose Studio"))
 
     def factory(job):
         async def coro(job_arg=job):
@@ -493,6 +500,37 @@ def _escape(s: str) -> str:
 
 def _error_card(msg: str) -> str:
     return f"<div class='text-red-300 bg-red-500/10 p-4 rounded-lg'><strong>Error:</strong> {_escape(msg)}</div>"
+
+
+def _is_missing_llm_credentials(exc: Exception) -> bool:
+    msg = str(exc)
+    return (
+        "No LLM credentials found" in msg
+        and "OPENAI_API_KEY" in msg
+        and "AZURE_OPENAI_ENDPOINT" in msg
+        and "AZURE_OPENAI_KEY" in msg
+    )
+
+
+def _llm_credentials_configured() -> bool:
+    import os
+
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_azure = bool(os.getenv("AZURE_OPENAI_ENDPOINT")) and bool(os.getenv("AZURE_OPENAI_KEY"))
+    return has_openai or has_azure
+
+
+def _llm_credentials_missing_card(studio_name: str) -> str:
+    return (
+        "<div class='text-amber-200 bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg'>"
+        f"<div class='font-semibold mb-1'>LLM setup required for {studio_name}</div>"
+        "<div class='text-sm text-amber-100/90'>"
+        "Set either <code>OPENAI_API_KEY</code> or "
+        "<code>AZURE_OPENAI_ENDPOINT</code> + <code>AZURE_OPENAI_KEY</code> in your .env, "
+        "then restart the preview app."
+        "</div>"
+        "</div>"
+    )
 
 
 def _render_job_card(job_id: str) -> str:
