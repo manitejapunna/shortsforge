@@ -25,8 +25,10 @@ def _load_workspace() -> dict[str, dict]:
     if _WORKSPACE_FILE.exists():
         try:
             return json.loads(_WORKSPACE_FILE.read_text())
+        except json.JSONDecodeError:
+            logger.warning("workspace.corrupt", path=str(_WORKSPACE_FILE))
         except Exception:
-            pass
+            logger.exception("workspace.load_error", path=str(_WORKSPACE_FILE))
     return {}
 
 
@@ -36,7 +38,7 @@ def _save_workspace(data: dict[str, dict]) -> None:
     try:
         os.chmod(_WORKSPACE_FILE, stat.S_IRUSR | stat.S_IWUSR)
     except OSError:
-        pass
+        logger.warning("workspace.chmod_failed", path=str(_WORKSPACE_FILE))
 
 
 _workspace: dict[str, dict] = _load_workspace()
@@ -79,7 +81,7 @@ class CutClipArgs(BaseModel):
     def _no_shell_metachar(cls, v: str) -> str:
         forbidden = set("|&;`$<>(){}[]\\!\"'")
         if any(c in forbidden for c in v):
-            raise ValueError(f"clip_id contains forbidden character")
+            raise ValueError("clip_id contains forbidden character")
         return v
 
 
@@ -139,7 +141,9 @@ class RepurposeArgs(BaseModel):
     clip_id: str = Field(pattern=_ULID_RE)
     niche: str = Field(max_length=128)
     count: int = Field(default=3, ge=1, le=10)
-    caption_preset: Literal["bold-pop", "subtle-bottom", "glow-center", "meme"] = "bold-pop"
+    caption_preset: Literal["bold-pop", "subtle-bottom", "glow-center", "meme"] = (
+        "bold-pop"
+    )
     add_broll: bool = True
     kb_id: str | None = Field(default=None, max_length=256)
 
@@ -162,7 +166,10 @@ class PublishYouTubeArgs(BaseModel):
 # Tool implementations
 # ---------------------------------------------------------------------------
 
-@mcp.tool(description="Ingest a local video/audio file and register it as a clip. side_effect=write")
+
+@mcp.tool(
+    description="Ingest a local video/audio file and register it as a clip. side_effect=write"
+)
 async def ingest_video(source_path: str) -> dict:
     try:
         args = IngestArgs(source_path=source_path)
@@ -171,6 +178,7 @@ async def ingest_video(source_path: str) -> dict:
 
     try:
         from shortsforge.pipeline.ingest import ingest
+
         clip_id = str(ULID())
         transcript = ingest(args.source_path)
         _workspace[clip_id] = {
@@ -184,7 +192,9 @@ async def ingest_video(source_path: str) -> dict:
         return _err("INGEST_ERROR", str(exc))
 
 
-@mcp.tool(description="Transcribe an already-ingested clip. Returns word-level timestamps.")
+@mcp.tool(
+    description="Transcribe an already-ingested clip. Returns word-level timestamps."
+)
 async def transcribe(clip_id: str) -> dict:
     try:
         args = TranscribeArgs(clip_id=clip_id)
@@ -198,7 +208,9 @@ async def transcribe(clip_id: str) -> dict:
     return _ok(transcript=entry.get("transcript", {}))
 
 
-@mcp.tool(description="Cut a clip to a time range. Returns a new clip_id. side_effect=write")
+@mcp.tool(
+    description="Cut a clip to a time range. Returns a new clip_id. side_effect=write"
+)
 async def cut_clip(clip_id: str, start_s: float, end_s: float) -> dict:
     try:
         args = CutClipArgs(clip_id=clip_id, start_s=start_s, end_s=end_s)
@@ -212,6 +224,7 @@ async def cut_clip(clip_id: str, start_s: float, end_s: float) -> dict:
     try:
         from shortsforge.pipeline.edit import cut
         from shortsforge.security.paths import safe_output_path
+
         new_id = str(ULID())
         dst = safe_output_path(f"{new_id}.mp4")
         out = cut(entry["path"], args.start_s, args.end_s, dst)
@@ -237,6 +250,7 @@ async def reformat_vertical(clip_id: str, mode: str = "letterbox") -> dict:
     try:
         from shortsforge.pipeline.edit import reformat_to_vertical
         from shortsforge.security.paths import safe_output_path
+
         new_id = str(ULID())
         dst = safe_output_path(f"{new_id}_vertical.mp4")
         out = reformat_to_vertical(entry["path"], dst, args.mode)
@@ -261,7 +275,7 @@ async def style_captions(clip_id: str, preset: str = "bold-pop") -> dict:
 
     try:
         from shortsforge.pipeline.captions import render_captions_over, style_preset
-        from shortsforge.pipeline.ingest import Transcript, Word
+        from shortsforge.pipeline.ingest import Word
         from shortsforge.security.paths import safe_output_path
 
         transcript_data = entry.get("transcript", {})
@@ -282,7 +296,9 @@ async def style_captions(clip_id: str, preset: str = "bold-pop") -> dict:
         return _err("CAPTIONS_ERROR", str(exc))
 
 
-@mcp.tool(description="Render clips into a YouTube-Shorts-ready mp4. side_effect=render")
+@mcp.tool(
+    description="Render clips into a YouTube-Shorts-ready mp4. side_effect=render"
+)
 async def render_short(clip_ids: list[str], output_name: str) -> dict:
     try:
         args = RenderShortArgs(clip_ids=clip_ids, output_name=output_name)
@@ -297,8 +313,10 @@ async def render_short(clip_ids: list[str], output_name: str) -> dict:
         clips.append(entry["path"])
 
     try:
-        from shortsforge.pipeline.render import ClipRef, Timeline, render_short as _render
+        from shortsforge.pipeline.render import ClipRef, Timeline
+        from shortsforge.pipeline.render import render_short as _render
         from shortsforge.security.paths import safe_output_path
+
         timeline = Timeline(clips=[ClipRef(path=p) for p in clips])
         dst = safe_output_path(f"{args.output_name}.mp4")
         out = _render(timeline, dst)
@@ -318,7 +336,7 @@ async def preview_short(clip_id: str) -> dict:
         return _err("NOT_FOUND", f"Clip {clip_id!r} not found")
     try:
         import webbrowser
-        path = entry["path"]
+
         webbrowser.open(f"http://127.0.0.1:7878/clip/{clip_id}")
         return _ok(clip_id=clip_id, url=f"http://127.0.0.1:7878/clip/{clip_id}")
     except Exception as exc:
@@ -327,7 +345,9 @@ async def preview_short(clip_id: str) -> dict:
 
 @mcp.tool(description="List all clips in the workspace.")
 async def list_clips() -> dict:
-    return _ok(clips=[{"clip_id": k, "path": v.get("path")} for k, v in _workspace.items()])
+    return _ok(
+        clips=[{"clip_id": k, "path": v.get("path")} for k, v in _workspace.items()]
+    )
 
 
 @mcp.tool(description="Get details of a specific clip.")
@@ -347,6 +367,7 @@ async def kb_create(name: str) -> dict:
         return _err("VALIDATION_ERROR", str(exc))
     try:
         from shortsforge.providers.foundry_iq import FoundryIQ
+
         fiq = FoundryIQ.from_env()
         kb_id = await fiq.kb_create(args.name)
         await fiq.close()
@@ -363,6 +384,7 @@ async def kb_ingest(kb_id: str, source: str) -> dict:
         return _err("VALIDATION_ERROR", str(exc))
     try:
         from shortsforge.providers.foundry_iq import FoundryIQ
+
         fiq = FoundryIQ.from_env()
         job_id = await fiq.kb_ingest(args.kb_id, args.source)
         await fiq.close()
@@ -371,7 +393,9 @@ async def kb_ingest(kb_id: str, source: str) -> dict:
         return _err("KB_INGEST_ERROR", str(exc))
 
 
-@mcp.tool(description="Query a Foundry IQ knowledge base. Returns grounded answer + citations.")
+@mcp.tool(
+    description="Query a Foundry IQ knowledge base. Returns grounded answer + citations."
+)
 async def kb_query(kb_id: str, question: str, top_k: int = 8) -> dict:
     try:
         args = KbQueryArgs(kb_id=kb_id, question=question, top_k=top_k)
@@ -379,6 +403,7 @@ async def kb_query(kb_id: str, question: str, top_k: int = 8) -> dict:
         return _err("VALIDATION_ERROR", str(exc))
     try:
         from shortsforge.providers.foundry_iq import FoundryIQ
+
         fiq = FoundryIQ.from_env()
         result = await fiq.kb_query(args.kb_id, args.question, top_k=args.top_k)
         await fiq.close()
@@ -391,7 +416,9 @@ async def kb_query(kb_id: str, question: str, top_k: int = 8) -> dict:
         return _err("KB_QUERY_ERROR", str(exc))
 
 
-@mcp.tool(description="Generate a structured short-form story, optionally grounded via Foundry IQ.")
+@mcp.tool(
+    description="Generate a structured short-form story, optionally grounded via Foundry IQ."
+)
 async def generate_story(
     prompt: str,
     audience: str,
@@ -411,6 +438,7 @@ async def generate_story(
         return _err("VALIDATION_ERROR", str(exc))
     try:
         from shortsforge.pipeline.story import generate_story as _gen
+
         story = await _gen(
             args.prompt,
             audience=args.audience,
@@ -443,6 +471,7 @@ async def generate_script(
         return _err("VALIDATION_ERROR", str(exc))
     try:
         from shortsforge.pipeline.script import generate_script as _gen
+
         script = await _gen(
             args.logline,
             genre=args.genre,
@@ -469,6 +498,7 @@ async def detect_hooks(clip_id: str, niche: str, count: int = 3) -> dict:
     try:
         from shortsforge.pipeline.hooks import detect_hooks as _detect
         from shortsforge.pipeline.ingest import Transcript
+
         transcript = Transcript(**entry["transcript"])
         hooks = await _detect(
             transcript,
@@ -481,7 +511,9 @@ async def detect_hooks(clip_id: str, niche: str, count: int = 3) -> dict:
         return _err("HOOKS_ERROR", str(exc))
 
 
-@mcp.tool(description="One-shot repurpose: detect hooks + cut + reformat + captions + render. side_effect=render+network")
+@mcp.tool(
+    description="One-shot repurpose: detect hooks + cut + reformat + captions + render. side_effect=render+network"
+)
 async def repurpose(
     clip_id: str,
     niche: str,
@@ -492,8 +524,12 @@ async def repurpose(
 ) -> dict:
     try:
         args = RepurposeArgs(
-            clip_id=clip_id, niche=niche, count=count,
-            caption_preset=caption_preset, add_broll=add_broll, kb_id=kb_id,
+            clip_id=clip_id,
+            niche=niche,
+            count=count,
+            caption_preset=caption_preset,
+            add_broll=add_broll,
+            kb_id=kb_id,
         )
     except Exception as exc:
         return _err("VALIDATION_ERROR", str(exc))
@@ -504,6 +540,7 @@ async def repurpose(
 
     try:
         from shortsforge.pipeline.repurpose import repurpose as _repurpose
+
         results = await _repurpose(
             Path(entry["path"]),
             niche=args.niche,
@@ -522,9 +559,12 @@ async def repurpose(
         return _err("REPURPOSE_ERROR", str(exc))
 
 
-@mcp.tool(description="Request a publish consent token. Must be called before publish_youtube with visibility=public.")
+@mcp.tool(
+    description="Request a publish consent token. Must be called before publish_youtube with visibility=public."
+)
 async def request_publish_consent(clip_id: str, title: str) -> dict:
     import hashlib
+
     try:
         args = PublishConsentArgs(clip_id=clip_id, title=title)
     except Exception as exc:
@@ -540,7 +580,12 @@ async def request_publish_consent(clip_id: str, title: str) -> dict:
     )
 
 
-@mcp.tool(description="Publish a clip to YouTube. visibility=public requires a consent_token from request_publish_consent. side_effect=network+publish")
+@mcp.tool(
+    description=(
+        "Publish a clip to YouTube. visibility=public requires a consent_token "
+        "from request_publish_consent. side_effect=network+publish"
+    )
+)
 async def publish_youtube(
     clip_id: str,
     title: str,
@@ -551,8 +596,11 @@ async def publish_youtube(
 ) -> dict:
     try:
         args = PublishYouTubeArgs(
-            clip_id=clip_id, title=title, description=description,
-            tags=tags or [], visibility=visibility,  # type: ignore[arg-type]
+            clip_id=clip_id,
+            title=title,
+            description=description,
+            tags=tags or [],
+            visibility=visibility,  # type: ignore[arg-type]
             consent_token=consent_token,
         )
     except Exception as exc:
@@ -564,6 +612,7 @@ async def publish_youtube(
 
     try:
         from shortsforge.publishing.youtube import publish_youtube as _publish
+
         result = await _publish(
             clip_id=args.clip_id,
             title=args.title,
@@ -581,6 +630,7 @@ async def publish_youtube(
 def main() -> None:
     """Entry point for the MCP server."""
     from shortsforge.security.secrets import configure_logging
+
     configure_logging()
     mcp.run(transport="stdio")
 

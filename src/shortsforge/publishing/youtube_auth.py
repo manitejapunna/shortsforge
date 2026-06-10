@@ -31,7 +31,6 @@ def _check_file_permissions(path: Path) -> None:
 
 def _get_fernet():
     """Get or create a Fernet key from the OS keyring."""
-    import base64
 
     import keyring
     from cryptography.fernet import Fernet
@@ -53,7 +52,9 @@ def _decrypt_token(data: bytes) -> str:
 
 def run_oauth_flow() -> None:
     """Run the installed-app OAuth flow and store encrypted credentials."""
-    from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore[import-untyped]
+    from google_auth_oauthlib.flow import (
+        InstalledAppFlow,  # type: ignore[import-untyped]
+    )
 
     client_secret_path = os.environ.get("YOUTUBE_CLIENT_SECRET_PATH")
     if not client_secret_path:
@@ -98,7 +99,10 @@ def get_youtube_service():
     creds = Credentials.from_authorized_user_info(json.loads(token_json), _SCOPES)
 
     if not creds.valid:
-        from google.auth.transport.requests import Request  # type: ignore[import-untyped]
+        from google.auth.transport.requests import (
+            Request,  # type: ignore[import-untyped]
+        )
+
         creds.refresh(Request())
         # Re-encrypt and save
         _TOKEN_FILE.write_bytes(_encrypt_token(creds.to_json()))

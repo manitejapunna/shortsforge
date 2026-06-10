@@ -14,7 +14,7 @@ import structlog
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from ulid import ULID
 
@@ -43,12 +43,15 @@ _last_activity = time.time()
 # Workspace helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_workspace() -> dict[str, dict]:
     if _WORKSPACE_FILE.exists():
         try:
             return json.loads(_WORKSPACE_FILE.read_text())
+        except json.JSONDecodeError:
+            logger.warning("preview.workspace_corrupt", path=str(_WORKSPACE_FILE))
         except Exception:
-            pass
+            logger.exception("preview.workspace_load_failed", path=str(_WORKSPACE_FILE))
     return {}
 
 
@@ -57,7 +60,9 @@ def _save_workspace(data: dict[str, dict]) -> None:
     _WORKSPACE_FILE.write_text(json.dumps(data, indent=2))
 
 
-def _register_clip(clip_id: str, path: Path, parent: str | None = None, **extra) -> None:
+def _register_clip(
+    clip_id: str, path: Path, parent: str | None = None, **extra
+) -> None:
     ws = _load_workspace()
     ws[clip_id] = {"path": str(path), "parent": parent, **extra}
     _save_workspace(ws)
@@ -71,6 +76,7 @@ def _touch():
 # ---------------------------------------------------------------------------
 # Routes — pages
 # ---------------------------------------------------------------------------
+
 
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
@@ -106,7 +112,9 @@ async def script_page(request: Request):
 @app.get("/repurpose", response_class=HTMLResponse)
 async def repurpose_page(request: Request):
     _touch()
-    return templates.TemplateResponse(request, "repurpose.html", {"active": "/repurpose"})
+    return templates.TemplateResponse(
+        request, "repurpose.html", {"active": "/repurpose"}
+    )
 
 
 @app.get("/clips", response_class=HTMLResponse)
@@ -149,6 +157,7 @@ async def jobs_page(request: Request):
 # Routes — actions (HTMX fragments)
 # ---------------------------------------------------------------------------
 
+
 @app.post("/story/generate", response_class=HTMLResponse)
 async def story_generate(
     prompt: str = Form(...),
@@ -160,6 +169,7 @@ async def story_generate(
     _touch()
     try:
         from shortsforge.pipeline.story import generate_story
+
         story = await generate_story(
             prompt,
             audience=audience,
@@ -219,8 +229,8 @@ async def story_render(story_json: str = Form(...)):
     _touch()
     try:
         from shortsforge.pipeline.render import render_storyboard
-        from shortsforge.pipeline.storyboard import storyboard
         from shortsforge.pipeline.story import Story
+        from shortsforge.pipeline.storyboard import storyboard
         from shortsforge.security.paths import safe_output_path
 
         story = Story.model_validate_json(story_json)
@@ -238,6 +248,7 @@ async def story_render(story_json: str = Form(...)):
                 job_arg.update(progress=0.95, message="Registering clip…")
                 _register_clip(clip_id, out, source="story")
                 return {"clip_id": clip_id, "path": str(out)}
+
             return coro(job)
 
         job = job_manager.submit(render_factory)
@@ -258,6 +269,7 @@ async def script_generate(
     _touch()
     try:
         from shortsforge.pipeline.script import generate_script
+
         chars = [c.strip() for c in characters.split(",") if c.strip()]
         script = await generate_script(
             logline,
@@ -276,18 +288,32 @@ async def script_generate(
     lines_html = ""
     for line in script.lines:
         if line.type == "slugline":
-            lines_html += f'<div class="font-bold text-blue-300 uppercase mt-3">{_escape(line.text)}</div>'
+            lines_html += (
+                f'<div class="font-bold text-blue-300 uppercase mt-3">'
+                f"{_escape(line.text)}"
+                "</div>"
+            )
         elif line.type == "character":
-            lines_html += f'<div class="font-semibold text-orange-300 text-center mt-3 uppercase">{_escape(line.text)}</div>'
+            lines_html += (
+                f'<div class="font-semibold text-orange-300 text-center mt-3 uppercase">'
+                f"{_escape(line.text)}"
+                "</div>"
+            )
         elif line.type == "parenthetical":
             lines_html += f'<div class="text-center text-slate-500 italic">({_escape(line.text)})</div>'
         elif line.type == "dialogue":
             lines_html += f'<div class="text-center text-slate-200 mx-12">{_escape(line.text)}</div>'
         elif line.type in ("action", "voiceover"):
             speaker = f"[{_escape(line.speaker)}] " if line.speaker else ""
-            lines_html += f'<div class="text-slate-300 my-2">{speaker}{_escape(line.text)}</div>'
+            lines_html += (
+                f'<div class="text-slate-300 my-2">{speaker}{_escape(line.text)}</div>'
+            )
         elif line.type == "transition":
-            lines_html += f'<div class="text-right text-blue-300 font-semibold uppercase mt-3">{_escape(line.text)}:</div>'
+            lines_html += (
+                f'<div class="text-right text-blue-300 font-semibold uppercase mt-3">'
+                f"{_escape(line.text)}:"
+                "</div>"
+            )
 
     citations_html = ""
     if script.citations:
@@ -302,7 +328,9 @@ async def script_generate(
     return HTMLResponse(f"""
     <div>
       <h2 class="text-xl font-bold mb-1">{_escape(script.title)}</h2>
-      <div class="text-xs text-slate-500 mb-4">{_escape(script.genre)} · {script.format} · {len(script.lines)} lines</div>
+            <div class="text-xs text-slate-500 mb-4">
+                {_escape(script.genre)} · {script.format} · {len(script.lines)} lines
+            </div>
       <div class="font-mono text-sm space-y-1 max-h-[500px] overflow-y-auto pr-2">
         {lines_html}
       </div>
@@ -329,7 +357,11 @@ async def repurpose_start(
     def factory(job):
         async def coro(job_arg=job):
             from shortsforge.pipeline.repurpose import repurpose
-            job_arg.update(progress=0.05, message=f"Starting repurpose of {Path(source_path).name}…")
+
+            job_arg.update(
+                progress=0.05,
+                message=f"Starting repurpose of {Path(source_path).name}…",
+            )
             results = await repurpose(
                 source_path,
                 niche=niche,
@@ -342,12 +374,16 @@ async def repurpose_start(
                 _register_clip(r.clip_id, r.path, parent=source_path, title=r.title)
             return {
                 "clips": [
-                    {"clip_id": r.clip_id, "title": r.title,
-                     "retention": r.predicted_retention,
-                     "citations": len(r.citations)}
+                    {
+                        "clip_id": r.clip_id,
+                        "title": r.title,
+                        "retention": r.predicted_retention,
+                        "citations": len(r.citations),
+                    }
                     for r in results
                 ]
             }
+
         return coro(job)
 
     job = job_manager.submit(factory)
@@ -356,67 +392,74 @@ async def repurpose_start(
 
 @app.get("/jobs/{job_id}/status", response_class=HTMLResponse)
 async def job_status(job_id: str):
-        job = job_manager.get(job_id)
-        if not job:
-                return HTMLResponse("<div class='text-red-300'>Job not found</div>")
+    job = job_manager.get(job_id)
+    if not job:
+        return HTMLResponse("<div class='text-red-300'>Job not found</div>")
 
-        if job.state == "done":
-                clips_html = ""
-                if job.result and "clips" in job.result:
-                        for c in job.result["clips"]:
-                                clips_html += f"""
-                                <a href="/clip/{c['clip_id']}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 mb-2">
+    if job.state == "done":
+        clips_html = ""
+        if job.result and "clips" in job.result:
+            for c in job.result["clips"]:
+                title = _escape(c.get("title", c["clip_id"][:12]))
+                retention = (c.get("retention", 0) * 100)
+                citations = c.get("citations", 0)
+                clips_html += f"""
+                                <a
+                                    href="/clip/{c["clip_id"]}"
+                                    class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 mb-2"
+                                >
                                     <div class="flex justify-between">
-                                        <div class="text-sm font-semibold">{_escape(c.get('title', c['clip_id'][:12]))}</div>
-                                        <div class="text-xs text-green-300">{(c.get('retention', 0)*100):.0f}% retention</div>
+                                        <div class="text-sm font-semibold">{title}</div>
+                                        <div class="text-xs text-green-300">{retention:.0f}% retention</div>
                                     </div>
-                                    <div class="text-xs text-slate-500 mt-1">📎 {c.get('citations', 0)} citations</div>
+                                    <div class="text-xs text-slate-500 mt-1">📎 {citations} citations</div>
                                 </a>
                                 """
-                elif job.result and "clip_id" in job.result:
-                        cid = job.result["clip_id"]
-                        clips_html = f"""
+        elif job.result and "clip_id" in job.result:
+            cid = job.result["clip_id"]
+            clips_html = f"""
                         <a href="/clip/{cid}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3">
                             <div class="text-sm font-semibold">✓ Rendered</div>
                             <div class="text-xs text-orange-300 font-mono">{cid[:16]}…</div>
                         </a>
                         """
-                return HTMLResponse(f"""
+        return HTMLResponse(f"""
                 <div hx-trigger="none">
                     <div class="text-green-300 mb-2">✓ Done</div>
                     {clips_html}
                 </div>
                 """)
 
-        if job.state == "error":
-                return HTMLResponse(f"""
+    if job.state == "error":
+        return HTMLResponse(f"""
                 <div hx-trigger="none">
                     <div class="text-red-300 bg-red-500/10 p-3 rounded-lg">
-                        <strong>✗ Error:</strong> {_escape(job.error or 'unknown')}
+                        <strong>✗ Error:</strong> {_escape(job.error or "unknown")}
                     </div>
                 </div>
                 """)
 
-        if job.state == "cancelled":
-                return HTMLResponse(f"""
+    if job.state == "cancelled":
+        return HTMLResponse(f"""
                 <div hx-trigger="none">
                     <div class="text-amber-300 bg-amber-500/10 p-3 rounded-lg">
-                        <strong>⏹ Cancelled:</strong> {_escape(job.error or 'Cancelled by user')}
+                        <strong>⏹ Cancelled:</strong> {_escape(job.error or "Cancelled by user")}
                     </div>
                 </div>
                 """)
 
-        pct = int(job.progress * 100)
-        log_html = "".join(f"<div>{_escape(l)}</div>" for l in job.log[-6:])
-        return HTMLResponse(f"""
+    pct = int(job.progress * 100)
+    log_html = "".join(f"<div>{_escape(log_line)}</div>" for log_line in job.log[-6:])
+    return HTMLResponse(f"""
         <div hx-get="/jobs/{job_id}/status" hx-trigger="every 1s" hx-swap="outerHTML">
             <div class="flex items-center justify-between gap-3 mb-2">
-                <div class="text-blue-300 text-sm">{_escape(job.message or 'Working…')}</div>
+                <div class="text-blue-300 text-sm">{_escape(job.message or "Working…")}</div>
                 <button
                     hx-post="/jobs/{job_id}/cancel"
                     hx-target="closest div"
                     hx-swap="outerHTML"
-                    class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 px-2.5 py-1 rounded border border-amber-500/30"
+                    class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-200
+                           px-2.5 py-1 rounded border border-amber-500/30"
                 >
                     ⏹ Stop job
                 </button>
@@ -452,13 +495,17 @@ async def publish_clip(
     _touch()
     try:
         from shortsforge.publishing.youtube import publish_youtube
+
         consent_token = None
         if visibility == "public":
             import hashlib
+
             consent_token = hashlib.sha256(f"{clip_id}{title}".encode()).hexdigest()
 
         result = await publish_youtube(
-            clip_id=clip_id, title=title, description=description,
+            clip_id=clip_id,
+            title=title,
+            description=description,
             visibility=visibility,  # type: ignore[arg-type]
             consent_token=consent_token,
         )
@@ -485,16 +532,21 @@ async def serve_media(clip_id: str) -> Response:
     path = Path(entry.get("path", ""))
     if not path.exists() or path.suffix.lower() not in {".mp4", ".mov", ".m4v"}:
         return Response(status_code=403)
-    return Response(content=path.read_bytes(), media_type="video/mp4",
-                    headers={"Accept-Ranges": "bytes"})
+    return Response(
+        content=path.read_bytes(),
+        media_type="video/mp4",
+        headers={"Accept-Ranges": "bytes"},
+    )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _escape(s: str) -> str:
     import html
+
     return html.escape(str(s))
 
 
@@ -516,7 +568,9 @@ def _llm_credentials_configured() -> bool:
     import os
 
     has_openai = bool(os.getenv("OPENAI_API_KEY"))
-    has_azure = bool(os.getenv("AZURE_OPENAI_ENDPOINT")) and bool(os.getenv("AZURE_OPENAI_KEY"))
+    has_azure = bool(os.getenv("AZURE_OPENAI_ENDPOINT")) and bool(
+        os.getenv("AZURE_OPENAI_KEY")
+    )
     return has_openai or has_azure
 
 
@@ -548,6 +602,7 @@ def _render_job_card(job_id: str) -> str:
 # Server entrypoint
 # ---------------------------------------------------------------------------
 
+
 def run_preview_server(*, open_browser: bool = True) -> None:
     """Start the app. Binds to 127.0.0.1 only; idle-shutdown after 30 min."""
     if _BIND_HOST not in ("127.0.0.1", "localhost", "::1"):
@@ -558,6 +613,7 @@ def run_preview_server(*, open_browser: bool = True) -> None:
 
     def _idle_check():
         import threading
+
         def check():
             while True:
                 time.sleep(60)
@@ -565,14 +621,17 @@ def run_preview_server(*, open_browser: bool = True) -> None:
                     logger.info("preview.idle_shutdown")
                     server.should_exit = True
                     return
+
         threading.Thread(target=check, daemon=True).start()
 
     if open_browser:
         import threading
         import webbrowser
+
         def _open():
             time.sleep(1.0)
             webbrowser.open(f"http://{_BIND_HOST}:{_PORT}")
+
         threading.Thread(target=_open, daemon=True).start()
 
     _idle_check()

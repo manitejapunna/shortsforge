@@ -64,7 +64,9 @@ async def generate_image(
 
 async def _generate_via_openai(prompt: str, width: int, height: int) -> bytes:
     import base64
+
     import httpx
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
@@ -92,6 +94,7 @@ def _fallback_image(path: Path, width: int, height: int) -> Path:
     """Generate a soft gradient fallback image."""
     try:
         from PIL import Image
+
         img = Image.new("RGB", (width, height), color=(30, 30, 60))
         img.save(str(path), "PNG")
         logger.warning("imagery.using_fallback")

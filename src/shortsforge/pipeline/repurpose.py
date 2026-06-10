@@ -38,7 +38,6 @@ async def repurpose(
     from shortsforge.pipeline.ingest import ingest
     from shortsforge.pipeline.render import ClipRef, Timeline, render_short
     from shortsforge.security.paths import safe_output_path
-    from shortsforge.security.rate_limit import LLM_BUCKET
 
     # Step 1: Ingest + transcribe
     logger.info("repurpose.ingest", video=str(video))
@@ -59,9 +58,13 @@ async def repurpose(
     async def process_hook(hook: object, idx: int) -> ClipResult | None:
         async with semaphore:
             try:
-                from shortsforge.pipeline.captions import render_captions_over, style_preset
-                from shortsforge.pipeline.edit import cut
                 from ulid import ULID
+
+                from shortsforge.pipeline.captions import (
+                    render_captions_over,
+                    style_preset,
+                )
+                from shortsforge.pipeline.edit import cut
 
                 clip_id = str(ULID())
                 # Cut
@@ -75,7 +78,9 @@ async def repurpose(
                 )
 
                 # Reformat vertical
-                vert_dst = safe_output_path(f"{clip_id}_vertical.mp4", studio="repurpose")
+                vert_dst = safe_output_path(
+                    f"{clip_id}_vertical.mp4", studio="repurpose"
+                )
                 vert_path = await asyncio.to_thread(
                     reformat_to_vertical,
                     cut_path,
@@ -85,7 +90,9 @@ async def repurpose(
 
                 # Captions
                 style = style_preset(caption_preset)
-                cap_dst = safe_output_path(f"{clip_id}_captioned.mp4", studio="repurpose")
+                cap_dst = safe_output_path(
+                    f"{clip_id}_captioned.mp4", studio="repurpose"
+                )
                 cap_path = await asyncio.to_thread(
                     render_captions_over,
                     vert_path,
@@ -102,6 +109,7 @@ async def repurpose(
                 citations: list[str] = []
                 if kb_id:
                     from shortsforge.providers.foundry_iq import FoundryIQ
+
                     fiq = FoundryIQ.from_env()
                     result = await fiq.kb_query(kb_id, hook.headline, top_k=3)
                     citations = [c.source for c in result.citations]
@@ -131,7 +139,9 @@ async def repurpose(
         )
 
     if errors:
-        logger.warning("repurpose.partial_failure", failed=len(errors), succeeded=len(results))
+        logger.warning(
+            "repurpose.partial_failure", failed=len(errors), succeeded=len(results)
+        )
 
     logger.info("repurpose.done", clips=len(results))
     return results

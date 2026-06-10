@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -36,7 +37,9 @@ class Job:
     _event: asyncio.Event = field(default_factory=asyncio.Event)
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
-    def update(self, *, progress: float | None = None, message: str | None = None) -> None:
+    def update(
+        self, *, progress: float | None = None, message: str | None = None
+    ) -> None:
         if progress is not None:
             self.progress = progress
         if message is not None:
@@ -131,7 +134,9 @@ class JobManager:
         return job.cancel(reason)
 
     def list_recent(self, limit: int = 20) -> list[Job]:
-        return sorted(self._jobs.values(), key=lambda j: j.created_at, reverse=True)[:limit]
+        return sorted(self._jobs.values(), key=lambda j: j.created_at, reverse=True)[
+            :limit
+        ]
 
 
 # Singleton

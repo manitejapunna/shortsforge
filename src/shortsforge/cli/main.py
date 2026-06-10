@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 
 console = Console()
@@ -18,19 +23,33 @@ console = Console()
 def cli() -> None:
     """ShortsForge — AI-powered short-form video studio."""
     from shortsforge.security.secrets import configure_logging
+
     configure_logging()
 
 
 @cli.command()
 @click.argument("src", type=click.Path(exists=True))
 @click.option("--niche", required=True, help="Content niche (e.g. 'AI devtools')")
-@click.option("--count", default=3, show_default=True, help="Number of Shorts to generate")
-@click.option("--preset", default="bold-pop", show_default=True,
-              type=click.Choice(["bold-pop", "subtle-bottom", "glow-center", "meme"]))
-@click.option("--publish", is_flag=True, help="Prompt to publish each clip after rendering")
-@click.option("--kb-id", default=None, help="Foundry IQ knowledge base ID for grounding")
-def repurpose(src: str, niche: str, count: int, preset: str, publish: bool, kb_id: str | None) -> None:
+@click.option(
+    "--count", default=3, show_default=True, help="Number of Shorts to generate"
+)
+@click.option(
+    "--preset",
+    default="bold-pop",
+    show_default=True,
+    type=click.Choice(["bold-pop", "subtle-bottom", "glow-center", "meme"]),
+)
+@click.option(
+    "--publish", is_flag=True, help="Prompt to publish each clip after rendering"
+)
+@click.option(
+    "--kb-id", default=None, help="Foundry IQ knowledge base ID for grounding"
+)
+def repurpose(
+    src: str, niche: str, count: int, preset: str, publish: bool, kb_id: str | None
+) -> None:
     """Repurpose a long-form video into YouTube Shorts."""
+
     async def _run():
         from shortsforge.pipeline.repurpose import repurpose as _repurpose
 
@@ -41,7 +60,9 @@ def repurpose(src: str, niche: str, count: int, preset: str, publish: bool, kb_i
             TimeElapsedColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task(f"Repurposing {Path(src).name} → {count} Shorts", total=None)
+            task = progress.add_task(
+                f"Repurposing {Path(src).name} → {count} Shorts", total=None
+            )
             results = await _repurpose(
                 Path(src),
                 niche=niche,
@@ -77,7 +98,9 @@ def repurpose(src: str, niche: str, count: int, preset: str, publish: bool, kb_i
                     default="unlisted",
                 )
                 if vis == "public":
-                    console.print("[yellow]⚠ Public upload requires explicit consent.[/yellow]")
+                    console.print(
+                        "[yellow]⚠ Public upload requires explicit consent.[/yellow]"
+                    )
                     confirmed = click.confirm(f"Confirm public publish of '{r.title}'?")
                     if not confirmed:
                         console.print("Skipped.")
@@ -92,22 +115,34 @@ def repurpose(src: str, niche: str, count: int, preset: str, publish: bool, kb_i
 @click.option("--prompt", required=True, help="Story idea or topic")
 @click.option("--audience", default="general", help="Target audience")
 @click.option("--length", default=30, type=int, help="Target duration in seconds")
-@click.option("--tone", default="uplifting",
-              type=click.Choice(["soothing", "punchy", "mysterious", "uplifting", "educational"]))
+@click.option(
+    "--tone",
+    default="uplifting",
+    type=click.Choice(["soothing", "punchy", "mysterious", "uplifting", "educational"]),
+)
 @click.option("--kb-id", default=None, help="Foundry IQ KB for grounding")
-def story(prompt: str, audience: str, length: int, tone: str, kb_id: str | None) -> None:
+def story(
+    prompt: str, audience: str, length: int, tone: str, kb_id: str | None
+) -> None:
     """Generate a short-form story."""
+
     async def _run():
         from shortsforge.pipeline.story import generate_story
+
         with console.status("Generating story…"):
             s = await generate_story(
-                prompt, audience=audience, length_seconds=length,
-                tone=tone, kb_id=kb_id,  # type: ignore[arg-type]
+                prompt,
+                audience=audience,
+                length_seconds=length,
+                tone=tone,
+                kb_id=kb_id,  # type: ignore[arg-type]
             )
         console.print(f"[green]✓[/green] [bold]{s.title}[/bold]")
         console.print(f"[dim]{s.logline}[/dim]\n")
         for i, scene in enumerate(s.scenes, 1):
-            console.print(f"[cyan]Scene {i}[/cyan] ({scene.duration_s:.1f}s) — {scene.beat}")
+            console.print(
+                f"[cyan]Scene {i}[/cyan] ({scene.duration_s:.1f}s) — {scene.beat}"
+            )
             console.print(f"  VO: {scene.voiceover_text[:80]}…")
         if s.citations:
             console.print(f"\n[dim]Sources: {', '.join(s.citations[:5])}[/dim]")
@@ -119,17 +154,28 @@ def story(prompt: str, audience: str, length: int, tone: str, kb_id: str | None)
 @click.option("--logline", required=True)
 @click.option("--genre", default="drama")
 @click.option("--characters", multiple=True, default=["Narrator"])
-@click.option("--format", "fmt", default="voiceover",
-              type=click.Choice(["screenplay", "dialogue", "voiceover"]))
+@click.option(
+    "--format",
+    "fmt",
+    default="voiceover",
+    type=click.Choice(["screenplay", "dialogue", "voiceover"]),
+)
 @click.option("--kb-id", default=None)
-def script(logline: str, genre: str, characters: tuple, fmt: str, kb_id: str | None) -> None:
+def script(
+    logline: str, genre: str, characters: tuple, fmt: str, kb_id: str | None
+) -> None:
     """Generate a short-form script."""
+
     async def _run():
         from shortsforge.pipeline.script import generate_script
+
         with console.status("Writing script…"):
             sc = await generate_script(
-                logline, genre=genre, characters=list(characters),
-                format=fmt, kb_id=kb_id,  # type: ignore[arg-type]
+                logline,
+                genre=genre,
+                characters=list(characters),
+                format=fmt,
+                kb_id=kb_id,  # type: ignore[arg-type]
             )
         console.print(f"[green]✓[/green] [bold]{sc.title}[/bold]\n")
         if fmt == "screenplay":
@@ -147,6 +193,7 @@ def script(logline: str, genre: str, characters: tuple, fmt: str, kb_id: str | N
 def app(no_browser: bool) -> None:
     """Launch the ShortsForge web app at http://127.0.0.1:7878."""
     from shortsforge.preview.app import run_preview_server
+
     console.print("[bold orange3]Starting ShortsForge Studio...[/bold orange3]")
     console.print("[dim]URL: http://127.0.0.1:7878 (localhost only)[/dim]")
     console.print("[dim]Press Ctrl+C to stop[/dim]\n")
@@ -162,6 +209,7 @@ def auth() -> None:
 def auth_youtube() -> None:
     """Authenticate with YouTube using OAuth."""
     from shortsforge.publishing.youtube_auth import run_oauth_flow
+
     console.print("[dim]Starting YouTube OAuth flow...[/dim]")
     run_oauth_flow()
     console.print("[green]YouTube authentication complete.[/green]")

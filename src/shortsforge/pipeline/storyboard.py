@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Union
-
 import structlog
 from pydantic import BaseModel
 
@@ -55,8 +53,7 @@ def storyboard(source: object) -> list[Scene]:
     # Handle Script objects
     elif hasattr(source, "lines") and hasattr(source, "format"):
         voiceover_lines = [
-            ln for ln in source.lines
-            if ln.type in ("voiceover", "dialogue", "action")
+            ln for ln in source.lines if ln.type in ("voiceover", "dialogue", "action")
         ]
         chunk_dur = 5.0  # default seconds per spoken line
         for ln in voiceover_lines:

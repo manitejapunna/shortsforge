@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,10 +9,8 @@ import pytest
 
 from shortsforge.pipeline.ingest import (
     InputTooLargeError,
-    Segment,
     Transcript,
     UnsupportedMediaError,
-    Word,
     _is_youtube_url,
     ingest,
 )
@@ -30,8 +27,16 @@ def _make_fake_whisper_output():
     segment.start = 0.0
     segment.end = 5.0
     segment.text = "Hello world"
-    word1 = MagicMock(); word1.start = 0.0; word1.end = 0.5; word1.word = "Hello"; word1.probability = 0.99
-    word2 = MagicMock(); word2.start = 0.6; word2.end = 1.2; word2.word = "world"; word2.probability = 0.98
+    word1 = MagicMock()
+    word1.start = 0.0
+    word1.end = 0.5
+    word1.word = "Hello"
+    word1.probability = 0.99
+    word2 = MagicMock()
+    word2.start = 0.6
+    word2.end = 1.2
+    word2.word = "world"
+    word2.probability = 0.98
     segment.words = [word1, word2]
 
     info = MagicMock()
@@ -45,7 +50,9 @@ def _make_fake_whisper_output():
 @pytest.fixture
 def tiny_wav(tmp_path: Path) -> Path:
     """Create a tiny valid WAV fixture in the allowed input roots."""
-    import wave, struct
+    import struct
+    import wave
+
     # Register tmp_path as an allowed root for this test
     wav_path = tmp_path / "test.wav"
     with wave.open(str(wav_path), "w") as wf:
@@ -113,7 +120,9 @@ class TestIngest:
     @patch("faster_whisper.WhisperModel")
     @patch("shortsforge.pipeline.ingest._probe_media")
     @patch("shortsforge.pipeline.ingest.safe_resolve")
-    def test_over_duration_rejected(self, mock_resolve, mock_probe, mock_whisper_cls, tmp_path):
+    def test_over_duration_rejected(
+        self, mock_resolve, mock_probe, mock_whisper_cls, tmp_path
+    ):
         """Videos over the duration limit must raise InputTooLargeError."""
         f = tmp_path / "long.mp4"
         f.write_bytes(b"\x00" * 100)
@@ -126,7 +135,9 @@ class TestIngest:
     @patch("faster_whisper.WhisperModel")
     @patch("shortsforge.pipeline.ingest._probe_media")
     @patch("shortsforge.pipeline.ingest._download_youtube_video")
-    def test_youtube_url_uses_downloaded_file(self, mock_download, mock_probe, mock_whisper_cls, tmp_path):
+    def test_youtube_url_uses_downloaded_file(
+        self, mock_download, mock_probe, mock_whisper_cls, tmp_path
+    ):
         """YouTube sources should be downloaded first, then processed as local files."""
         downloaded = tmp_path / "yt.mp4"
         downloaded.write_bytes(b"\x00" * 1024)

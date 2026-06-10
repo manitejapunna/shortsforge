@@ -6,16 +6,14 @@ import subprocess
 from pathlib import Path
 from typing import Literal
 
-import ffmpeg
 import structlog
 
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 from shortsforge.security.paths import (
     ALLOWED_INPUT_ROOTS,
     ALLOWED_OUTPUT_ROOTS,
-    UnsafePathError,
     safe_resolve,
 )
-from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +28,7 @@ def _safe_ffmpeg_run(args: list[str]) -> None:
     """Run ffmpeg with shell=False. Raises subprocess.CalledProcessError on failure."""
     ensure_ffmpeg_tools_on_path()
     try:
-        subprocess.run(  # noqa: S603  (shell=False, fixed argv)
+        subprocess.run(
             args,
             shell=False,
             stdin=subprocess.DEVNULL,
@@ -68,12 +66,18 @@ def cut(
     dst.parent.mkdir(parents=True, exist_ok=True)
 
     args = [
-        "ffmpeg", "-y",
-        "-ss", str(start_s),
-        "-to", str(end_s),
-        "-i", str(src),
-        "-c", "copy",
-        "-avoid_negative_ts", "make_zero",
+        "ffmpeg",
+        "-y",
+        "-ss",
+        str(start_s),
+        "-to",
+        str(end_s),
+        "-i",
+        str(src),
+        "-c",
+        "copy",
+        "-avoid_negative_ts",
+        "make_zero",
         str(dst),
     ]
     logger.info("cut.start", src=src.name, start=start_s, end=end_s, dst=dst.name)
@@ -126,14 +130,26 @@ def _reformat_letterbox(src: Path, dst: Path) -> None:
         "[bgblur][fgpad]overlay=0:0[out]"
     )
     args = [
-        "ffmpeg", "-y",
-        "-i", str(src),
-        "-filter_complex", vf,
-        "-map", "[out]",
-        "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-filter_complex",
+        vf,
+        "-map",
+        "[out]",
+        "-map",
+        "0:a?",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
         str(dst),
     ]
     _safe_ffmpeg_run(args)
@@ -141,17 +157,24 @@ def _reformat_letterbox(src: Path, dst: Path) -> None:
 
 def _reformat_smart_crop(src: Path, dst: Path) -> None:
     """Static centre crop to 1080x1920."""
-    vf = (
-        "scale=iw*max(1080/iw\\,1920/ih):ih*max(1080/iw\\,1920/ih),"
-        "crop=1080:1920"
-    )
+    vf = "scale=iw*max(1080/iw\\,1920/ih):ih*max(1080/iw\\,1920/ih),crop=1080:1920"
     args = [
-        "ffmpeg", "-y",
-        "-i", str(src),
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
         str(dst),
     ]
     _safe_ffmpeg_run(args)
@@ -194,7 +217,7 @@ def _reformat_speaker_track(src: Path, dst: Path) -> None:
 
     # Smooth centres with a rolling average
     smoothed: list[tuple[int, int]] = []
-    for i, (cx, cy) in enumerate(centres):
+    for i, (_cx, _cy) in enumerate(centres):
         lo = max(0, i - window // 2)
         hi = min(len(centres), i + window // 2 + 1)
         window_pts = centres[lo:hi]
@@ -217,12 +240,22 @@ def _reformat_speaker_track(src: Path, dst: Path) -> None:
 
     vf = f"scale={sw}:{sh},crop={target_w}:{target_h}:{crop_x}:{crop_y}"
     args = [
-        "ffmpeg", "-y",
-        "-i", str(src),
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
         str(dst),
     ]
     _safe_ffmpeg_run(args)
@@ -236,20 +269,23 @@ def concat(clip_paths: list[str | Path], dst_path: str | Path) -> Path:
     dst = safe_resolve(dst_path, allowed_roots=ALLOWED_OUTPUT_ROOTS)
     dst.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
-    ) as flist:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as flist:
         for src in srcs:
             flist.write(f"file '{src}'\n")
         flist_path = flist.name
 
     try:
         args = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", flist_path,
-            "-c", "copy",
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            flist_path,
+            "-c",
+            "copy",
             str(dst),
         ]
         _safe_ffmpeg_run(args)

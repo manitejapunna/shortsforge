@@ -14,7 +14,11 @@ import structlog
 from pydantic import BaseModel
 
 from shortsforge.security.moderation import check_text
-from shortsforge.security.rate_limit import UPLOAD_DAY_BUCKET, UPLOAD_HOUR_BUCKET, RateLimitExceeded
+from shortsforge.security.rate_limit import (
+    UPLOAD_DAY_BUCKET,
+    UPLOAD_HOUR_BUCKET,
+    RateLimitExceeded,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -62,7 +66,10 @@ def _write_audit(
 def _sanitize_text(text: str, max_len: int) -> str:
     """Strip control chars and length-limit."""
     import unicodedata
-    cleaned = "".join(c for c in text if unicodedata.category(c)[0] != "C" or c in "\n\r\t")
+
+    cleaned = "".join(
+        c for c in text if unicodedata.category(c)[0] != "C" or c in "\n\r\t"
+    )
     return cleaned[:max_len]
 
 
@@ -135,6 +142,7 @@ async def publish_youtube(
     # Actual upload via YouTube Data API
     try:
         from shortsforge.publishing.youtube_auth import get_youtube_service
+
         youtube = get_youtube_service()
         clip_path = _get_clip_path(clip_id)
 

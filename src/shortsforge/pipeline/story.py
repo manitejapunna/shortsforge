@@ -9,7 +9,7 @@ import structlog
 from pydantic import BaseModel, ValidationError
 
 from shortsforge.providers import llm
-from shortsforge.security.prompt_guard import sanitize, wrap_untrusted
+from shortsforge.security.prompt_guard import sanitize
 
 logger = structlog.get_logger(__name__)
 
@@ -61,6 +61,7 @@ async def generate_story(
 
     if kb_id:
         from shortsforge.providers.foundry_iq import FoundryIQ
+
         fiq = FoundryIQ.from_env()
         result = await fiq.kb_query(kb_id, safe_prompt, top_k=8)
         grounding_context = result.grounded_text  # already wrapped with guard
@@ -109,7 +110,11 @@ Respond with JSON matching this schema:
             f"Error context: parsing failed.\nOriginal:\n{raw}"
         )
         raw2 = await llm.complete(
-            _SYSTEM, retry_msg, temperature=0.2, max_tokens=3000, response_format="json_object"
+            _SYSTEM,
+            retry_msg,
+            temperature=0.2,
+            max_tokens=3000,
+            response_format="json_object",
         )
         story = _parse_story(raw2, grounding_citations)
         if story is None:

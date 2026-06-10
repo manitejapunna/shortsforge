@@ -9,8 +9,14 @@ from typing import Literal
 # Resolve relative to the project root so the path is stable regardless of CWD.
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]  # .../shortsforge/
 _DEFAULT_RUNTIME_ROOT = _PROJECT_ROOT / "output"
-_RUNTIME_ROOT = Path(os.getenv("SHORTSFORGE_RUNTIME_DIR", str(_DEFAULT_RUNTIME_ROOT))).resolve()
-_OUTPUT_DIR = _RUNTIME_ROOT if _RUNTIME_ROOT.name.lower() == "output" else (_RUNTIME_ROOT / "output").resolve()
+_RUNTIME_ROOT = Path(
+    os.getenv("SHORTSFORGE_RUNTIME_DIR", str(_DEFAULT_RUNTIME_ROOT))
+).resolve()
+_OUTPUT_DIR = (
+    _RUNTIME_ROOT
+    if _RUNTIME_ROOT.name.lower() == "output"
+    else (_RUNTIME_ROOT / "output").resolve()
+)
 _IMPORTS_DIR = (_RUNTIME_ROOT / "imports").resolve()
 _WORKSPACE_FILE = (_RUNTIME_ROOT / "workspace.json").resolve()
 _STUDIO_DIRS: dict[str, Path] = {
@@ -40,6 +46,7 @@ def runtime_imports_dir() -> Path:
 def runtime_workspace_file() -> Path:
     root = runtime_root()
     return (root / "workspace.json").resolve()
+
 
 ALLOWED_INPUT_ROOTS: list[Path] = [
     Path("samples").resolve(),

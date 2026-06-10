@@ -52,7 +52,7 @@ class FoundryIQ:
         )
 
     @classmethod
-    def from_env(cls) -> "FoundryIQ":
+    def from_env(cls) -> FoundryIQ:
         """Construct from AZURE_FOUNDRY_ENDPOINT and AZURE_FOUNDRY_KEY env vars."""
         endpoint = os.environ.get("AZURE_FOUNDRY_ENDPOINT", "")
         api_key = os.environ.get("AZURE_FOUNDRY_KEY", "")

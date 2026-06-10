@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,7 +28,7 @@ class HookCandidate(BaseModel):
 
 
 async def detect_hooks(
-    transcript: "Transcript",
+    transcript: Transcript,
     source_audio: Path,
     *,
     niche: str,
@@ -52,7 +51,6 @@ async def detect_hooks(
     if not transcript.segments:
         return []
 
-    duration = transcript.duration_s
     windows = _build_windows(transcript, min_len_s, max_len_s)
 
     # Score windows
@@ -75,7 +73,9 @@ async def detect_hooks(
 
     # Normalize hook durations and snap boundaries to word endings.
     snapped = [
-        _normalize_and_snap_boundaries(h, transcript, min_len_s=min_len_s, max_len_s=max_len_s)
+        _normalize_and_snap_boundaries(
+            h, transcript, min_len_s=min_len_s, max_len_s=max_len_s
+        )
         for h in hooks
     ]
     snapped = _dedupe_overlaps(snapped, max_count=count)
@@ -104,7 +104,9 @@ async def detect_hooks(
     return snapped
 
 
-def _build_windows(transcript: "Transcript", min_len: float, max_len: float) -> list[dict]:
+def _build_windows(
+    transcript: Transcript, min_len: float, max_len: float
+) -> list[dict]:
     """Slide windows over the transcript at 5-second steps."""
     windows = []
     duration = transcript.duration_s
@@ -126,7 +128,7 @@ def _build_windows(transcript: "Transcript", min_len: float, max_len: float) -> 
     return windows
 
 
-def _score_window(window: dict, transcript: "Transcript") -> float:
+def _score_window(window: dict, transcript: Transcript) -> float:
     """Score a time window using cheap heuristics."""
     start, end = window["start"], window["end"]
     text_parts = []
@@ -146,9 +148,20 @@ def _score_window(window: dict, transcript: "Transcript") -> float:
 
     # High-retention keywords
     hook_words = [
-        "never", "always", "secret", "amazing", "shocking", "truth",
-        "revealed", "you won't believe", "actually", "finally",
-        "mistake", "wrong", "real", "first time",
+        "never",
+        "always",
+        "secret",
+        "amazing",
+        "shocking",
+        "truth",
+        "revealed",
+        "you won't believe",
+        "actually",
+        "finally",
+        "mistake",
+        "wrong",
+        "real",
+        "first time",
     ]
     text_lower = text.lower()
     for kw in hook_words:
@@ -173,7 +186,7 @@ def _score_window(window: dict, transcript: "Transcript") -> float:
 
 async def _llm_rerank(
     shortlist: list[dict],
-    transcript: "Transcript",
+    transcript: Transcript,
     niche: str,
     count: int,
 ) -> list[HookCandidate]:
@@ -187,7 +200,8 @@ async def _llm_rerank(
     for w in shortlist:
         start, end = w["start"], w["end"]
         text = " ".join(
-            seg.text for seg in transcript.segments
+            seg.text
+            for seg in transcript.segments
             if not (seg.end < start or seg.start > end)
         )
         snippets.append({"start": start, "end": end, "text": text[:300]})
@@ -228,6 +242,7 @@ async def _llm_rerank(
     try:
         # Extract JSON array from response
         import re
+
         match = re.search(r"\[.*\]", raw, re.DOTALL)
         if not match:
             raise ValueError("No JSON array in LLM response")
@@ -250,7 +265,7 @@ async def _llm_rerank(
 
 def _normalize_and_snap_boundaries(
     hook: HookCandidate,
-    transcript: "Transcript",
+    transcript: Transcript,
     *,
     min_len_s: float,
     max_len_s: float,
@@ -288,7 +303,9 @@ def _overlap_ratio(a: HookCandidate, b: HookCandidate) -> float:
     return overlap / shortest
 
 
-def _dedupe_overlaps(hooks: list[HookCandidate], *, max_count: int) -> list[HookCandidate]:
+def _dedupe_overlaps(
+    hooks: list[HookCandidate], *, max_count: int
+) -> list[HookCandidate]:
     selected: list[HookCandidate] = []
     for hook in sorted(hooks, key=lambda h: h.predicted_retention, reverse=True):
         if all(_overlap_ratio(hook, s) < 0.75 for s in selected):

@@ -5,19 +5,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from urllib.parse import urlparse
-from typing import Optional
 
 import ffmpeg
 import structlog
 from pydantic import BaseModel, Field
 
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 from shortsforge.security.paths import (
     ALLOWED_INPUT_ROOTS,
-    UnsafePathError,
     runtime_imports_dir,
     safe_resolve,
 )
-from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 
 logger = structlog.get_logger(__name__)
 
@@ -25,7 +23,9 @@ logger = structlog.get_logger(__name__)
 _MAX_SIZE_BYTES = int(os.getenv("SHORTSFORGE_MAX_INPUT_SIZE_GB", "2")) * 1024**3
 _MAX_DURATION_S = int(os.getenv("SHORTSFORGE_MAX_INPUT_DURATION_HOURS", "4")) * 3600
 _WHISPER_MODEL = os.getenv("SHORTSFORGE_WHISPER_MODEL", "base.en")
-_ALLOW_YOUTUBE_URL_INGEST = os.getenv("SHORTSFORGE_ALLOW_YOUTUBE_URL_INGEST", "1") == "1"
+_ALLOW_YOUTUBE_URL_INGEST = (
+    os.getenv("SHORTSFORGE_ALLOW_YOUTUBE_URL_INGEST", "1") == "1"
+)
 _YOUTUBE_HOSTS = {
     "youtube.com",
     "www.youtube.com",
@@ -56,7 +56,7 @@ class Segment(BaseModel):
     end: float
     text: str
     words: list[Word] = Field(default_factory=list)
-    speaker: Optional[str] = None
+    speaker: str | None = None
 
 
 class Transcript(BaseModel):

@@ -45,6 +45,7 @@ async def _elevenlabs_synthesize(
     text: str, voice_id: str, api_key: str, dst: Path
 ) -> None:
     import httpx
+
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
@@ -60,12 +61,14 @@ async def _gtts_synthesize(text: str, dst: Path) -> None:
     """Simple fallback using gTTS (no API key required)."""
     try:
         from gtts import gTTS  # type: ignore[import-untyped]
+
         tts = gTTS(text=text, lang="en", slow=False)
         tts.save(str(dst))
     except ImportError:
         # Last resort: write a silent 1s WAV
         import struct
         import wave
+
         with wave.open(str(dst.with_suffix(".wav")), "w") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)

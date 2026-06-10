@@ -35,10 +35,7 @@ def _get_client() -> AsyncOpenAI | AsyncAzureOpenAI:
 
 
 def _get_model() -> str:
-    return (
-        os.getenv("AZURE_OPENAI_DEPLOYMENT")
-        or os.getenv("OPENAI_MODEL", "gpt-4o")
-    )
+    return os.getenv("AZURE_OPENAI_DEPLOYMENT") or os.getenv("OPENAI_MODEL", "gpt-4o")
 
 
 async def complete(
@@ -70,5 +67,7 @@ async def complete(
     logger.debug("llm.request", model=model, temperature=temperature)
     response = await client.chat.completions.create(**kwargs)
     content = response.choices[0].message.content or ""
-    logger.debug("llm.response", tokens=response.usage.total_tokens if response.usage else 0)
+    logger.debug(
+        "llm.response", tokens=response.usage.total_tokens if response.usage else 0
+    )
     return content

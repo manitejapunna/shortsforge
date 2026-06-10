@@ -35,12 +35,16 @@ async def check_text(text: str) -> bool:
                 data = resp.json()
                 flagged: bool = data["results"][0]["flagged"]
                 if flagged:
-                    logger.warning("Text moderation: content flagged [attempt=%d]", attempt)
+                    logger.warning(
+                        "Text moderation: content flagged [attempt=%d]", attempt
+                    )
                 return not flagged
         except Exception:
             logger.exception("Text moderation request failed [attempt=%d]", attempt)
             if attempt >= _MAX_RETRIES:
-                logger.error("Moderation failed after %d retries; failing closed", _MAX_RETRIES)
+                logger.error(
+                    "Moderation failed after %d retries; failing closed", _MAX_RETRIES
+                )
                 return False
     return False
 
@@ -62,7 +66,9 @@ async def check_image(image_bytes: bytes) -> bool:
     b64 = base64.b64encode(image_bytes).decode()
     payload = {
         "model": "omni-moderation-latest",
-        "input": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}],
+        "input": [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
+        ],
     }
 
     for attempt in range(_MAX_RETRIES + 1):
@@ -77,7 +83,9 @@ async def check_image(image_bytes: bytes) -> bool:
                 data = resp.json()
                 flagged: bool = data["results"][0]["flagged"]
                 if flagged:
-                    logger.warning("Image moderation: content flagged [attempt=%d]", attempt)
+                    logger.warning(
+                        "Image moderation: content flagged [attempt=%d]", attempt
+                    )
                 return not flagged
         except Exception:
             logger.exception("Image moderation request failed [attempt=%d]", attempt)

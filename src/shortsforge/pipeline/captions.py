@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -14,7 +14,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 from shortsforge.pipeline.ingest import Word
 from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
-from shortsforge.security.paths import ALLOWED_OUTPUT_ROOTS, runtime_output_dir, safe_resolve
+from shortsforge.security.paths import (
+    ALLOWED_OUTPUT_ROOTS,
+    runtime_output_dir,
+    safe_resolve,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -85,7 +89,9 @@ def style_preset(name: str) -> CaptionStyle:
     return presets[name]
 
 
-def _load_font(style: CaptionStyle, size: int | None = None) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def _load_font(
+    style: CaptionStyle, size: int | None = None
+) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     sz = size or style.font_size
     if style.font_path:
         font_path = Path(style.font_path)
@@ -148,7 +154,7 @@ def _render_caption_frame(
         x = (width - text_w) // 2
 
         # Draw stroke
-        stroke_color = style.stroke_rgb + (a,)
+        stroke_color = (*style.stroke_rgb, a)
         for dx in range(-style.stroke_w, style.stroke_w + 1):
             for dy in range(-style.stroke_w, style.stroke_w + 1):
                 if dx == 0 and dy == 0:
@@ -158,9 +164,9 @@ def _render_caption_frame(
         # Draw fill — highlight current word if karaoke mode
         if highlight_word and highlight_word in line and style.anim == "karaoke":
             # Simple: render whole line in highlight color
-            fill_color = style.highlight_rgb + (a,)
+            fill_color = (*style.highlight_rgb, a)
         else:
-            fill_color = style.fill_rgb + (a,)
+            fill_color = (*style.fill_rgb, a)
 
         draw.text((x, y_start), line, font=font, fill=fill_color)
         y_start += line_h
@@ -181,16 +187,27 @@ def render_captions_over(
     import subprocess
     import tempfile
 
-    src = safe_resolve(input_mp4, allowed_roots=[runtime_output_dir(), Path("samples").resolve()])
+    src = safe_resolve(
+        input_mp4, allowed_roots=[runtime_output_dir(), Path("samples").resolve()]
+    )
     dst = safe_resolve(output_mp4, allowed_roots=ALLOWED_OUTPUT_ROOTS)
     dst.parent.mkdir(parents=True, exist_ok=True)
     ensure_ffmpeg_tools_on_path()
 
     # Probe dimensions
     import json
+
     try:
-        probe_result = subprocess.run(  # noqa: S603
-            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", str(src)],
+        probe_result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_streams",
+                str(src),
+            ],
             shell=False,
             capture_output=True,
             stdin=subprocess.DEVNULL,
@@ -220,10 +237,20 @@ def render_captions_over(
         tmp = Path(tmpdir)
         # Get total frame count from video duration
         try:
-            dur_result = subprocess.run(  # noqa: S603
-                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(src)],
-                shell=False, capture_output=True, stdin=subprocess.DEVNULL,
+            dur_result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(src),
+                ],
+                shell=False,
+                capture_output=True,
+                stdin=subprocess.DEVNULL,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
@@ -234,7 +261,7 @@ def render_captions_over(
         except ValueError:
             total_duration = 60.0
 
-        total_frames = int(math.ceil(total_duration * _FPS))
+        total_frames = math.ceil(total_duration * _FPS)
 
         # Render one frame per caption chunk covering its time range
         for frame_idx in range(total_frames):
@@ -266,28 +293,47 @@ def render_captions_over(
                     elif elapsed > chunk_dur - 0.1:
                         alpha = (chunk_dur - elapsed) / 0.1
 
-                frame = _render_caption_frame(text, current_word, style, width, height, alpha)
+                frame = _render_caption_frame(
+                    text, current_word, style, width, height, alpha
+                )
 
             frame.save(tmp / f"frame{frame_idx:06d}.png")
 
         # Overlay via ffmpeg
         args = [
-            "ffmpeg", "-y",
-            "-i", str(src),
-            "-framerate", str(_FPS),
-            "-i", str(tmp / "frame%06d.png"),
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(src),
+            "-framerate",
+            str(_FPS),
+            "-i",
+            str(tmp / "frame%06d.png"),
             "-filter_complex",
             "[0:v][1:v]overlay=0:0:format=auto[out]",
-            "-map", "[out]",
-            "-map", "0:a?",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
+            "-map",
+            "[out]",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
             str(dst),
         ]
         try:
-            subprocess.run(  # noqa: S603
-                args, shell=False, stdin=subprocess.DEVNULL, check=True, capture_output=True
+            subprocess.run(
+                args,
+                shell=False,
+                stdin=subprocess.DEVNULL,
+                check=True,
+                capture_output=True,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(

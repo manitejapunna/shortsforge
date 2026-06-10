@@ -10,12 +10,12 @@ import structlog
 
 # Patterns for redacting secrets in log records
 _SECRET_PATTERNS = [
-    re.compile(r"sk-[A-Za-z0-9\-_]{10,}"),           # OpenAI keys
-    re.compile(r"ghp_[A-Za-z0-9]{36,}"),              # GitHub PAT
-    re.compile(r"ghs_[A-Za-z0-9]{36,}"),              # GitHub Actions token
-    re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*"),   # Bearer tokens
-    re.compile(r"ya29\.[A-Za-z0-9\-_]+"),             # Google OAuth tokens
-    re.compile(r"AIza[A-Za-z0-9\-_]{35}"),            # Google API keys
+    re.compile(r"sk-[A-Za-z0-9\-_]{10,}"),  # OpenAI keys
+    re.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub PAT
+    re.compile(r"ghs_[A-Za-z0-9]{36,}"),  # GitHub Actions token
+    re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*"),  # Bearer tokens
+    re.compile(r"ya29\.[A-Za-z0-9\-_]+"),  # Google OAuth tokens
+    re.compile(r"AIza[A-Za-z0-9\-_]{35}"),  # Google API keys
 ]
 
 _REDACTED = "[REDACTED]"
@@ -49,6 +49,7 @@ def get_secret(name: str, *, service: str = "shortsforge") -> str | None:
 
     try:
         import keyring
+
         value = keyring.get_password(service, name)
         return value
     except Exception:

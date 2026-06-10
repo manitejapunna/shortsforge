@@ -54,9 +54,15 @@ def test_normalize_and_snap_enforces_bounds():
 
 def test_dedupe_overlaps_keeps_distinct_hooks():
     hooks = [
-        HookCandidate(start_s=0, end_s=30, headline="a", predicted_retention=0.9, rationale="r"),
-        HookCandidate(start_s=5, end_s=35, headline="b", predicted_retention=0.8, rationale="r"),
-        HookCandidate(start_s=50, end_s=80, headline="c", predicted_retention=0.7, rationale="r"),
+        HookCandidate(
+            start_s=0, end_s=30, headline="a", predicted_retention=0.9, rationale="r"
+        ),
+        HookCandidate(
+            start_s=5, end_s=35, headline="b", predicted_retention=0.8, rationale="r"
+        ),
+        HookCandidate(
+            start_s=50, end_s=80, headline="c", predicted_retention=0.7, rationale="r"
+        ),
     ]
 
     selected = _dedupe_overlaps(hooks, max_count=3)

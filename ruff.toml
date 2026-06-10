@@ -1,3 +1,5 @@
+line-length = 120
+
 [lint]
 select = [
     "E",   # pycodestyle errors
@@ -14,6 +16,13 @@ select = [
 ignore = [
     "S101", # assert statements in tests
     "S603", # subprocess calls (we validate ourselves in security.paths)
+    "S607", # partial executable paths are validated by ffmpeg helper/path policy
+    "S608", # static SQL strings in local/session utilities
+    "ASYNC109", # timeout arg pattern is acceptable in this codebase
+    "ASYNC221", # subprocess usage is intentional in media pipelines
+    "ASYNC230", # local file IO in async wrappers is accepted for now
+    "ASYNC240", # pathlib usage in async wrappers is accepted for now
+    "RUF002", # allow existing Unicode punctuation in docstrings/text
 ]
 
 [lint.per-file-ignores]

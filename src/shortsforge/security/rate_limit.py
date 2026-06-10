@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from threading import Lock
@@ -19,18 +18,18 @@ class RateLimitExceeded(Exception):
 class TokenBucket:
     """Thread-safe token bucket with optional file persistence."""
 
-    _instances: ClassVar[dict[str, "TokenBucket"]] = {}
+    _instances: ClassVar[dict[str, TokenBucket]] = {}
 
     def __init__(self, name: str, rate: float, burst: int) -> None:
         self.name = name
-        self.rate = rate      # tokens per second
-        self.burst = burst    # max tokens
+        self.rate = rate  # tokens per second
+        self.burst = burst  # max tokens
         self._tokens: float = burst
         self._last_refill: float = time.monotonic()
         self._lock = Lock()
 
     @classmethod
-    def get(cls, name: str, rate: float = 1.0, burst: int = 10) -> "TokenBucket":
+    def get(cls, name: str, rate: float = 1.0, burst: int = 10) -> TokenBucket:
         if name not in cls._instances:
             cls._instances[name] = cls(name, rate, burst)
         return cls._instances[name]

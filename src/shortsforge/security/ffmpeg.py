@@ -39,5 +39,7 @@ def ensure_ffmpeg_tools_on_path() -> None:
         ffprobe_bin = cand / "ffprobe.exe"
         if ffmpeg_bin.exists() and ffprobe_bin.exists():
             current = os.environ.get("PATH", "")
-            os.environ["PATH"] = f"{cand}{os.pathsep}{current}" if current else str(cand)
+            os.environ["PATH"] = (
+                f"{cand}{os.pathsep}{current}" if current else str(cand)
+            )
             return

@@ -15,8 +15,15 @@ logger = structlog.get_logger(__name__)
 
 
 class ScriptLine(BaseModel):
-    type: Literal["slugline", "action", "character", "dialogue",
-                  "parenthetical", "voiceover", "transition"]
+    type: Literal[
+        "slugline",
+        "action",
+        "character",
+        "dialogue",
+        "parenthetical",
+        "voiceover",
+        "transition",
+    ]
     text: str
     speaker: str | None = None
     citations: list[str] = []
@@ -76,6 +83,7 @@ async def generate_script(
 
     if kb_id:
         from shortsforge.providers.foundry_iq import FoundryIQ
+
         fiq = FoundryIQ.from_env()
         result = await fiq.kb_query(kb_id, safe_logline, top_k=8)
         grounding_context = result.grounded_text
@@ -87,7 +95,7 @@ async def generate_script(
 
 Logline: {safe_logline}
 Genre: {safe_genre}
-Characters: {', '.join(safe_chars)}
+Characters: {", ".join(safe_chars)}
 Format: {format}
 
 {grounding_context}
@@ -102,7 +110,11 @@ Respond with JSON matching this schema:
 {json.dumps(schema, indent=2)}"""
 
     raw = await llm.complete(
-        _SYSTEM, user_msg, temperature=0.7, max_tokens=3000, response_format="json_object"
+        _SYSTEM,
+        user_msg,
+        temperature=0.7,
+        max_tokens=3000,
+        response_format="json_object",
     )
 
     script = _parse_script(raw, grounding_citations)
