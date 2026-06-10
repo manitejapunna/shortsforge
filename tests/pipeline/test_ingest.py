@@ -14,6 +14,7 @@ from shortsforge.pipeline.ingest import (
     Transcript,
     UnsupportedMediaError,
     Word,
+    _is_youtube_url,
     ingest,
 )
 from shortsforge.security.paths import UnsafePathError
@@ -56,6 +57,12 @@ def tiny_wav(tmp_path: Path) -> Path:
 
 
 class TestIngest:
+    def test_is_youtube_url(self):
+        assert _is_youtube_url("https://www.youtube.com/watch?v=abc123")
+        assert _is_youtube_url("https://youtu.be/abc123")
+        assert not _is_youtube_url("https://example.com/video.mp4")
+        assert not _is_youtube_url("file:///tmp/video.mp4")
+
     @patch("faster_whisper.WhisperModel")
     @patch("shortsforge.pipeline.ingest._probe_media")
     @patch("shortsforge.pipeline.ingest.safe_resolve")
@@ -115,3 +122,19 @@ class TestIngest:
 
         with pytest.raises(InputTooLargeError, match="Duration"):
             ingest(str(f))
+
+    @patch("faster_whisper.WhisperModel")
+    @patch("shortsforge.pipeline.ingest._probe_media")
+    @patch("shortsforge.pipeline.ingest._download_youtube_video")
+    def test_youtube_url_uses_downloaded_file(self, mock_download, mock_probe, mock_whisper_cls, tmp_path):
+        """YouTube sources should be downloaded first, then processed as local files."""
+        downloaded = tmp_path / "yt.mp4"
+        downloaded.write_bytes(b"\x00" * 1024)
+        mock_download.return_value = downloaded
+        mock_probe.return_value = _make_fake_probe(10.0)
+        mock_whisper_cls.return_value = _make_fake_whisper_output()
+
+        transcript = ingest("https://www.youtube.com/watch?v=abc123")
+
+        mock_download.assert_called_once()
+        assert transcript.source_path == str(downloaded)

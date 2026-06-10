@@ -13,12 +13,13 @@ import structlog
 from PIL import Image, ImageDraw, ImageFont
 
 from shortsforge.pipeline.ingest import Word
-from shortsforge.security.paths import ALLOWED_OUTPUT_ROOTS, safe_resolve
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
+from shortsforge.security.paths import ALLOWED_OUTPUT_ROOTS, runtime_output_dir, safe_resolve
 
 logger = structlog.get_logger(__name__)
 
 _ASSETS_FONTS = Path(__file__).parent.parent / "assets" / "fonts"
-_CACHE_DIR = Path("output") / ".cache" / "captions"
+_CACHE_DIR = runtime_output_dir() / ".cache" / "captions"
 _FPS = 30
 
 
@@ -180,18 +181,24 @@ def render_captions_over(
     import subprocess
     import tempfile
 
-    src = safe_resolve(input_mp4, allowed_roots=[Path("output").resolve(), Path("samples").resolve()])
+    src = safe_resolve(input_mp4, allowed_roots=[runtime_output_dir(), Path("samples").resolve()])
     dst = safe_resolve(output_mp4, allowed_roots=ALLOWED_OUTPUT_ROOTS)
     dst.parent.mkdir(parents=True, exist_ok=True)
+    ensure_ffmpeg_tools_on_path()
 
     # Probe dimensions
     import json
-    probe_result = subprocess.run(  # noqa: S603
-        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", str(src)],
-        shell=False,
-        capture_output=True,
-        stdin=subprocess.DEVNULL,
-    )
+    try:
+        probe_result = subprocess.run(  # noqa: S603
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", str(src)],
+            shell=False,
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "FFprobe is not installed or not on PATH. Install FFmpeg to enable caption rendering."
+        ) from exc
     probe_data = json.loads(probe_result.stdout)
     width, height = 1080, 1920
     for stream in probe_data.get("streams", []):
@@ -212,11 +219,16 @@ def render_captions_over(
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         # Get total frame count from video duration
-        dur_result = subprocess.run(  # noqa: S603
-            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(src)],
-            shell=False, capture_output=True, stdin=subprocess.DEVNULL,
-        )
+        try:
+            dur_result = subprocess.run(  # noqa: S603
+                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(src)],
+                shell=False, capture_output=True, stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "FFprobe is not installed or not on PATH. Install FFmpeg to enable caption rendering."
+            ) from exc
         try:
             total_duration = float(dur_result.stdout.strip())
         except ValueError:
@@ -273,9 +285,14 @@ def render_captions_over(
             "-c:a", "aac",
             str(dst),
         ]
-        subprocess.run(  # noqa: S603
-            args, shell=False, stdin=subprocess.DEVNULL, check=True, capture_output=True
-        )
+        try:
+            subprocess.run(  # noqa: S603
+                args, shell=False, stdin=subprocess.DEVNULL, check=True, capture_output=True
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "FFmpeg is not installed or not on PATH. Install FFmpeg to render caption overlays."
+            ) from exc
 
     logger.info("captions.done", dst=dst.name, words=len(words))
     return dst

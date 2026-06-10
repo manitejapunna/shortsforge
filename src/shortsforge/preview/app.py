@@ -12,19 +12,24 @@ from pathlib import Path
 
 import structlog
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from ulid import ULID
 
 from shortsforge.preview.jobs import manager as job_manager
+from shortsforge.security.paths import runtime_workspace_file
 
 logger = structlog.get_logger(__name__)
+
+# Load .env values when running the local preview app.
+load_dotenv()
 
 _BIND_HOST = "127.0.0.1"
 _PORT = 7878
 _IDLE_TIMEOUT_S = 1800
-_WORKSPACE_FILE = Path.home() / ".shortsforge" / "workspace.json"
+_WORKSPACE_FILE = runtime_workspace_file()
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -226,7 +231,7 @@ async def story_render(story_json: str = Form(...)):
                 scenes = storyboard(story)
                 job_arg.update(progress=0.3, message=f"Rendering {len(scenes)} scenes…")
                 clip_id = str(ULID())
-                dst = safe_output_path(f"{clip_id}.mp4")
+                dst = safe_output_path(f"{clip_id}.mp4", studio="story")
                 # render_storyboard is sync; run in executor
                 loop = asyncio.get_event_loop()
                 out = await loop.run_in_executor(None, render_storyboard, scenes, dst)
@@ -319,7 +324,7 @@ async def repurpose_start(
             from shortsforge.pipeline.repurpose import repurpose
             job_arg.update(progress=0.05, message=f"Starting repurpose of {Path(source_path).name}…")
             results = await repurpose(
-                Path(source_path),
+                source_path,
                 niche=niche,
                 count=count,
                 caption_preset=caption_preset,
@@ -344,59 +349,90 @@ async def repurpose_start(
 
 @app.get("/jobs/{job_id}/status", response_class=HTMLResponse)
 async def job_status(job_id: str):
-    job = job_manager.get(job_id)
-    if not job:
-        return HTMLResponse("<div class='text-red-300'>Job not found</div>")
+        job = job_manager.get(job_id)
+        if not job:
+                return HTMLResponse("<div class='text-red-300'>Job not found</div>")
 
-    if job.state == "done":
-        clips_html = ""
-        if job.result and "clips" in job.result:
-            for c in job.result["clips"]:
-                clips_html += f"""
-                <a href="/clip/{c['clip_id']}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 mb-2">
-                  <div class="flex justify-between">
-                    <div class="text-sm font-semibold">{_escape(c.get('title', c['clip_id'][:12]))}</div>
-                    <div class="text-xs text-green-300">{(c.get('retention', 0)*100):.0f}% retention</div>
-                  </div>
-                  <div class="text-xs text-slate-500 mt-1">📎 {c.get('citations', 0)} citations</div>
-                </a>
-                """
-        elif job.result and "clip_id" in job.result:
-            cid = job.result["clip_id"]
-            clips_html = f"""
-            <a href="/clip/{cid}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3">
-              <div class="text-sm font-semibold">✓ Rendered</div>
-              <div class="text-xs text-orange-300 font-mono">{cid[:16]}…</div>
-            </a>
-            """
-        return HTMLResponse(f"""
-        <div hx-trigger="none">
-          <div class="text-green-300 mb-2">✓ Done</div>
-          {clips_html}
-        </div>
-        """)
-    elif job.state == "error":
-        return HTMLResponse(f"""
-        <div hx-trigger="none">
-          <div class="text-red-300 bg-red-500/10 p-3 rounded-lg">
-            <strong>✗ Error:</strong> {_escape(job.error or 'unknown')}
-          </div>
-        </div>
-        """)
-    else:
+        if job.state == "done":
+                clips_html = ""
+                if job.result and "clips" in job.result:
+                        for c in job.result["clips"]:
+                                clips_html += f"""
+                                <a href="/clip/{c['clip_id']}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 mb-2">
+                                    <div class="flex justify-between">
+                                        <div class="text-sm font-semibold">{_escape(c.get('title', c['clip_id'][:12]))}</div>
+                                        <div class="text-xs text-green-300">{(c.get('retention', 0)*100):.0f}% retention</div>
+                                    </div>
+                                    <div class="text-xs text-slate-500 mt-1">📎 {c.get('citations', 0)} citations</div>
+                                </a>
+                                """
+                elif job.result and "clip_id" in job.result:
+                        cid = job.result["clip_id"]
+                        clips_html = f"""
+                        <a href="/clip/{cid}" class="block bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3">
+                            <div class="text-sm font-semibold">✓ Rendered</div>
+                            <div class="text-xs text-orange-300 font-mono">{cid[:16]}…</div>
+                        </a>
+                        """
+                return HTMLResponse(f"""
+                <div hx-trigger="none">
+                    <div class="text-green-300 mb-2">✓ Done</div>
+                    {clips_html}
+                </div>
+                """)
+
+        if job.state == "error":
+                return HTMLResponse(f"""
+                <div hx-trigger="none">
+                    <div class="text-red-300 bg-red-500/10 p-3 rounded-lg">
+                        <strong>✗ Error:</strong> {_escape(job.error or 'unknown')}
+                    </div>
+                </div>
+                """)
+
+        if job.state == "cancelled":
+                return HTMLResponse(f"""
+                <div hx-trigger="none">
+                    <div class="text-amber-300 bg-amber-500/10 p-3 rounded-lg">
+                        <strong>⏹ Cancelled:</strong> {_escape(job.error or 'Cancelled by user')}
+                    </div>
+                </div>
+                """)
+
         pct = int(job.progress * 100)
         log_html = "".join(f"<div>{_escape(l)}</div>" for l in job.log[-6:])
         return HTMLResponse(f"""
         <div hx-get="/jobs/{job_id}/status" hx-trigger="every 1s" hx-swap="outerHTML">
-          <div class="text-blue-300 text-sm mb-2">{_escape(job.message or 'Working…')}</div>
-          <div class="bg-slate-800 rounded-full h-2 overflow-hidden mb-3">
-            <div class="bg-blue-400 h-full transition-all" style="width: {pct}%"></div>
-          </div>
-          <div class="text-xs font-mono text-slate-500 space-y-0.5 max-h-32 overflow-y-auto">
-            {log_html}
-          </div>
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="text-blue-300 text-sm">{_escape(job.message or 'Working…')}</div>
+                <button
+                    hx-post="/jobs/{job_id}/cancel"
+                    hx-target="closest div"
+                    hx-swap="outerHTML"
+                    class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 px-2.5 py-1 rounded border border-amber-500/30"
+                >
+                    ⏹ Stop job
+                </button>
+            </div>
+            <div class="bg-slate-800 rounded-full h-2 overflow-hidden mb-3">
+                <div class="bg-blue-400 h-full transition-all" style="width: {pct}%"></div>
+            </div>
+            <div class="text-xs font-mono text-slate-500 space-y-0.5 max-h-32 overflow-y-auto">
+                {log_html}
+            </div>
         </div>
         """)
+
+
+@app.post("/jobs/{job_id}/cancel", response_class=HTMLResponse)
+async def cancel_job(job_id: str):
+    _touch()
+    job = job_manager.get(job_id)
+    if not job:
+        return HTMLResponse("<div class='text-red-300'>Job not found</div>")
+
+    job_manager.cancel(job_id, reason="Cancelled by user")
+    return await job_status(job_id)
 
 
 @app.post("/clip/{clip_id}/publish", response_class=HTMLResponse)

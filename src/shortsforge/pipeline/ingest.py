@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Optional
 
 import ffmpeg
 import structlog
 from pydantic import BaseModel, Field
 
-from shortsforge.security.paths import ALLOWED_INPUT_ROOTS, UnsafePathError, safe_resolve
+from shortsforge.security.paths import (
+    ALLOWED_INPUT_ROOTS,
+    UnsafePathError,
+    runtime_imports_dir,
+    safe_resolve,
+)
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 
 logger = structlog.get_logger(__name__)
 
@@ -18,6 +25,15 @@ logger = structlog.get_logger(__name__)
 _MAX_SIZE_BYTES = int(os.getenv("SHORTSFORGE_MAX_INPUT_SIZE_GB", "2")) * 1024**3
 _MAX_DURATION_S = int(os.getenv("SHORTSFORGE_MAX_INPUT_DURATION_HOURS", "4")) * 3600
 _WHISPER_MODEL = os.getenv("SHORTSFORGE_WHISPER_MODEL", "base.en")
+_ALLOW_YOUTUBE_URL_INGEST = os.getenv("SHORTSFORGE_ALLOW_YOUTUBE_URL_INGEST", "1") == "1"
+_YOUTUBE_HOSTS = {
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "youtu.be",
+    "www.youtu.be",
+}
+_REMOTE_IMPORT_DIR = runtime_imports_dir()
 
 
 class InputTooLargeError(ValueError):
@@ -60,8 +76,14 @@ class Transcript(BaseModel):
 
 def _probe_media(path: Path) -> dict:
     """Probe media file with ffmpeg. Raises UnsupportedMediaError on failure."""
+    ensure_ffmpeg_tools_on_path()
     try:
         return ffmpeg.probe(str(path))
+    except FileNotFoundError as exc:
+        raise UnsupportedMediaError(
+            "FFprobe is not installed or not on PATH. Install FFmpeg and ensure "
+            "'ffprobe' is available in your terminal."
+        ) from exc
     except ffmpeg.Error as exc:
         raise UnsupportedMediaError(
             f"ffmpeg cannot probe {path.name!r}: {exc.stderr.decode(errors='replace')}"
@@ -78,6 +100,54 @@ def _get_duration(probe_data: dict) -> float:
             if "duration" in stream:
                 return float(stream["duration"])
         return 0.0
+
+
+def _is_youtube_url(raw: str) -> bool:
+    try:
+        parsed = urlparse(raw)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = (parsed.hostname or "").lower()
+    return host in _YOUTUBE_HOSTS
+
+
+def _download_youtube_video(url: str) -> Path:
+    """Download a YouTube URL into the runtime imports directory and return local path."""
+    if not _ALLOW_YOUTUBE_URL_INGEST:
+        raise ValueError("YouTube URL ingest is disabled by policy")
+
+    try:
+        from yt_dlp import YoutubeDL  # type: ignore[import-untyped]
+    except Exception as exc:
+        raise RuntimeError(
+            "YouTube URL support requires 'yt-dlp'. Install dependencies and retry."
+        ) from exc
+
+    from ulid import ULID
+
+    _REMOTE_IMPORT_DIR.mkdir(parents=True, exist_ok=True)
+    clip_id = str(ULID())
+    outtmpl = str(_REMOTE_IMPORT_DIR / f"{clip_id}.%(ext)s")
+
+    ydl_opts = {
+        "format": "mp4/bestvideo+bestaudio/best",
+        "outtmpl": outtmpl,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        downloaded = Path(ydl.prepare_filename(info)).resolve()
+
+    # Keep downloaded files under controlled directory.
+    resolved = safe_resolve(downloaded, allowed_roots=ALLOWED_INPUT_ROOTS)
+    if not resolved.exists():
+        raise FileNotFoundError("yt-dlp completed but output file was not found")
+    return resolved
 
 
 def ingest(
@@ -98,8 +168,13 @@ def ingest(
     """
     log = logger.bind(request_id=request_id)
 
-    # --- Path safety ---
-    resolved = safe_resolve(source, allowed_roots=ALLOWED_INPUT_ROOTS)
+    source_str = str(source)
+
+    # --- Source safety ---
+    if _is_youtube_url(source_str):
+        resolved = _download_youtube_video(source_str)
+    else:
+        resolved = safe_resolve(source, allowed_roots=ALLOWED_INPUT_ROOTS)
     log.info("ingest.start", path=str(resolved))
 
     # --- File size guard ---

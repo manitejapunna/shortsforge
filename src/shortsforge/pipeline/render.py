@@ -11,14 +11,15 @@ import structlog
 from pydantic import BaseModel, Field, field_validator
 
 from shortsforge.security.disk import ensure_under_cap
-from shortsforge.security.paths import ALLOWED_OUTPUT_ROOTS, safe_resolve
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
+from shortsforge.security.paths import ALLOWED_OUTPUT_ROOTS, runtime_output_dir, safe_resolve
 
 if TYPE_CHECKING:
     pass
 
 logger = structlog.get_logger(__name__)
 
-_OUTPUT_DIR = Path("output")
+_OUTPUT_DIR = runtime_output_dir()
 _MAX_OUTPUT_BYTES = 5 * 1024**3  # 5 GB
 _MAX_SHORT_DURATION = 60.0       # YouTube Shorts hard cap
 _TARGET_W, _TARGET_H = 1080, 1920
@@ -70,13 +71,20 @@ class Timeline(BaseModel):
 
 def _run(args: list[str]) -> None:
     """Run a command with shell=False."""
-    subprocess.run(  # noqa: S603
-        args,
-        shell=False,
-        stdin=subprocess.DEVNULL,
-        check=True,
-        capture_output=True,
-    )
+    ensure_ffmpeg_tools_on_path()
+    try:
+        subprocess.run(  # noqa: S603
+            args,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            check=True,
+            capture_output=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "FFmpeg is not installed or not on PATH. Install FFmpeg and ensure both "
+            "'ffmpeg' and 'ffprobe' are available."
+        ) from exc
 
 
 def render_short(timeline: Timeline, dst_path: str | Path) -> Path:
@@ -86,6 +94,7 @@ def render_short(timeline: Timeline, dst_path: str | Path) -> Path:
     """
     # Disk cap guard
     ensure_under_cap(_OUTPUT_DIR, _MAX_OUTPUT_BYTES)
+    ensure_ffmpeg_tools_on_path()
 
     dst = safe_resolve(dst_path, allowed_roots=ALLOWED_OUTPUT_ROOTS)
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -112,11 +121,16 @@ def render_short(timeline: Timeline, dst_path: str | Path) -> Path:
         ])
 
         # Step 2: Enforce ≤60s duration
-        dur_result = subprocess.run(  # noqa: S603
-            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(concat_out)],
-            shell=False, capture_output=True, stdin=subprocess.DEVNULL,
-        )
+        try:
+            dur_result = subprocess.run(  # noqa: S603
+                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(concat_out)],
+                shell=False, capture_output=True, stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "FFprobe is not installed or not on PATH. Install FFmpeg and retry."
+            ) from exc
         try:
             actual_dur = float(dur_result.stdout.strip())
         except ValueError:

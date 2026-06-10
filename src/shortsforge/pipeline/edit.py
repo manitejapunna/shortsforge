@@ -15,6 +15,7 @@ from shortsforge.security.paths import (
     UnsafePathError,
     safe_resolve,
 )
+from shortsforge.security.ffmpeg import ensure_ffmpeg_tools_on_path
 
 logger = structlog.get_logger(__name__)
 
@@ -27,13 +28,20 @@ class ClipTooLongError(ValueError):
 
 def _safe_ffmpeg_run(args: list[str]) -> None:
     """Run ffmpeg with shell=False. Raises subprocess.CalledProcessError on failure."""
-    subprocess.run(  # noqa: S603  (shell=False, fixed argv)
-        args,
-        shell=False,
-        stdin=subprocess.DEVNULL,
-        check=True,
-        capture_output=True,
-    )
+    ensure_ffmpeg_tools_on_path()
+    try:
+        subprocess.run(  # noqa: S603  (shell=False, fixed argv)
+            args,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            check=True,
+            capture_output=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "FFmpeg is not installed or not on PATH. Install FFmpeg and ensure both "
+            "'ffmpeg' and 'ffprobe' are available in your terminal."
+        ) from exc
 
 
 def cut(

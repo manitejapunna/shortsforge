@@ -61,7 +61,8 @@ async def detect_hooks(
         score = _score_window(w, transcript)
         scored.append((score, w))
 
-    scored.sort(reverse=True)
+    # Sort by numeric score only; comparing dict payloads on ties raises TypeError.
+    scored.sort(key=lambda item: item[0], reverse=True)
     shortlist_size = min(count * 3, len(scored))
     shortlist = [w for _, w in scored[:shortlist_size]]
 
@@ -72,8 +73,32 @@ async def detect_hooks(
     hooks = await _llm_rerank(shortlist, transcript, niche, count)
     _LLM_CALL_COUNT += 1
 
-    # Snap boundaries to sentence/word endings
-    snapped = [_snap_boundaries(h, transcript) for h in hooks]
+    # Normalize hook durations and snap boundaries to word endings.
+    snapped = [
+        _normalize_and_snap_boundaries(h, transcript, min_len_s=min_len_s, max_len_s=max_len_s)
+        for h in hooks
+    ]
+    snapped = _dedupe_overlaps(snapped, max_count=count)
+
+    # Backfill if the LLM returned too few distinct windows.
+    if len(snapped) < count:
+        for w in shortlist:
+            fallback = _normalize_and_snap_boundaries(
+                HookCandidate(
+                    start_s=w["start"],
+                    end_s=w["end"],
+                    headline=f"Clip at {w['start']:.0f}s",
+                    predicted_retention=0.5,
+                    rationale="Heuristic selection",
+                ),
+                transcript,
+                min_len_s=min_len_s,
+                max_len_s=max_len_s,
+            )
+            if all(_overlap_ratio(fallback, s) < 0.75 for s in snapped):
+                snapped.append(fallback)
+            if len(snapped) >= count:
+                break
 
     logger.info("hooks.done", count=len(snapped), niche=niche)
     return snapped
@@ -84,10 +109,19 @@ def _build_windows(transcript: "Transcript", min_len: float, max_len: float) -> 
     windows = []
     duration = transcript.duration_s
     step = 5.0
+    lengths = sorted(
+        {
+            min_len,
+            min(max_len, min_len + 10.0),
+            min(max_len, min_len + 20.0),
+        }
+    )
     t = 0.0
     while t + min_len <= duration:
-        end = min(t + max_len, duration)
-        windows.append({"start": t, "end": end})
+        for win_len in lengths:
+            end = min(t + win_len, duration)
+            if end - t >= min_len:
+                windows.append({"start": t, "end": end})
         t += step
     return windows
 
@@ -176,7 +210,20 @@ async def _llm_rerank(
         f"Return JSON array of exactly {count} objects."
     )
 
-    raw = await llm.complete(system, user, temperature=0.4, max_tokens=2000)
+    try:
+        raw = await llm.complete(system, user, temperature=0.4, max_tokens=2000)
+    except Exception as exc:
+        logger.warning("hooks.llm_request_error", error=str(exc))
+        return [
+            HookCandidate(
+                start_s=w["start"],
+                end_s=w["end"],
+                headline=f"Clip at {w['start']:.0f}s",
+                predicted_retention=0.5,
+                rationale="Heuristic selection",
+            )
+            for w in shortlist[:count]
+        ]
 
     try:
         # Extract JSON array from response
@@ -201,16 +248,51 @@ async def _llm_rerank(
         ]
 
 
-def _snap_boundaries(hook: HookCandidate, transcript: "Transcript") -> HookCandidate:
-    """Snap hook boundaries to the nearest sentence/word ending."""
-    # Find closest word end near hook.end_s
-    best_end = hook.end_s
+def _normalize_and_snap_boundaries(
+    hook: HookCandidate,
+    transcript: "Transcript",
+    *,
+    min_len_s: float,
+    max_len_s: float,
+) -> HookCandidate:
+    """Clamp start/end into [0, duration] and enforce short-form length bounds."""
+    duration = max(transcript.duration_s, 1.0)
+
+    start = max(0.0, min(float(hook.start_s), duration - 1.0))
+    end = max(start + min_len_s, float(hook.end_s))
+    end = min(end, start + max_len_s, duration)
+
+    if end - start < min_len_s:
+        end = min(duration, start + min_len_s)
+
+    # Find closest word end near the target end.
+    best_end = end
     min_diff = float("inf")
     for seg in transcript.segments:
         for word in seg.words:
-            diff = abs(word.end - hook.end_s)
-            if diff < min_diff and word.end <= hook.end_s + 1.0:
+            if word.end < start + min_len_s:
+                continue
+            diff = abs(word.end - end)
+            if diff < min_diff and word.end <= end + 1.0:
                 min_diff = diff
                 best_end = word.end
 
-    return hook.model_copy(update={"end_s": best_end})
+    return hook.model_copy(update={"start_s": start, "end_s": best_end})
+
+
+def _overlap_ratio(a: HookCandidate, b: HookCandidate) -> float:
+    start = max(a.start_s, b.start_s)
+    end = min(a.end_s, b.end_s)
+    overlap = max(0.0, end - start)
+    shortest = max(1.0, min(a.end_s - a.start_s, b.end_s - b.start_s))
+    return overlap / shortest
+
+
+def _dedupe_overlaps(hooks: list[HookCandidate], *, max_count: int) -> list[HookCandidate]:
+    selected: list[HookCandidate] = []
+    for hook in sorted(hooks, key=lambda h: h.predicted_retention, reverse=True):
+        if all(_overlap_ratio(hook, s) < 0.75 for s in selected):
+            selected.append(hook)
+        if len(selected) >= max_count:
+            break
+    return sorted(selected, key=lambda h: h.start_s)
