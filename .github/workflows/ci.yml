@@ -40,7 +40,7 @@ jobs:
           fi
 
       - name: Pip audit
-        run: uv run pip-audit --require-hashes=false --severity high
+        run: uv run pip-audit
 
   test:
     name: Tests
